@@ -168,10 +168,13 @@ fn test_insert() {
   let mut rbt = RbTree::new();
   rbt.insert("key5", "E");
   rbt.insert("key1", "A");
-  rbt.insert("key4", "D");
-  rbt.insert("key2", "B");
-  rbt.insert("key6", "F");
   rbt.insert("key3", "C");
+  rbt.insert("key2", "B");
+  rbt.insert("key4", "D");
+  rbt.insert("key6", "F");
+  for (k, v) in rbt.iter() {
+    println!("key: {}, value: {}", *k, *v);
+  }
 }
 
 #[test]
