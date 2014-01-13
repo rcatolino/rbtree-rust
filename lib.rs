@@ -167,7 +167,12 @@ impl<'a, K: Ord, V> StackDec<'a, K, V> {
     })
   }
   #[inline]
-  fn current<'b>(&'b self) -> Option<&'b Node<K, V>> {
+  fn shorten<'b>(&'b mut self, how_much: uint) {
+    let new_len = self.inner.inner.len() - how_much;
+    self.inner.inner.truncate(new_len);
+  }
+  #[inline]
+  fn current<'b>(&'b mut self) -> Option<&'b mut Node<K, V>> {
     self.inner.inner.last_opt().and_then(|raw_node| unsafe {
       std::cast::transmute(raw_node)
     })
@@ -214,12 +219,25 @@ impl<K: Ord, V> RbTree<K, V> {
   }
 
   fn repaint<'a>(mut dec: StackDec<'a, K, V>) {
+    // Case 1.
+    if dec.parent().is_none() {
+      dec.current().unwrap().color == Black;
+      return;
+    }
     // Case 2.
     if dec.parent().unwrap().color == Black {
       return;
     }
-    if dec.uncle().unwrap().color == Red {
-    // Case 3.
+    if dec.uncle().map_or(false, |u| u.color == Red) {
+      // Case 3.
+      dec.shorten(2);
+      {
+        let gp = dec.current().unwrap();
+        gp.color = Red;
+        gp.left.as_mut().unwrap().color = Black;
+        gp.right.as_mut().unwrap().color = Black;
+      }
+      return RbTree::repaint(dec);
     } else {
     // Case 4.
     }
