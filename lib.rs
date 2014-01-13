@@ -38,11 +38,7 @@ struct Node<K, V> {
 impl<K: Ord, V> Node<K, V> {
   fn new(key: K, val: V) -> Node<K, V> {
     Node {
-      color: Black,
-      data: val,
-      key: key,
-      left: None,
-      right: None,
+      color: Black, data: val, key: key, left: None, right: None,
     }
   }
 
@@ -96,8 +92,7 @@ impl<K: Ord, V> RbTree<K, V> {
   /// Creates a new red-black tree.
   pub fn new() -> RbTree<K, V> {
     RbTree {
-      root: None,
-      len: 0,
+      root: None, len: 0,
     }
   }
 
@@ -112,10 +107,7 @@ impl<K: Ord, V> RbTree<K, V> {
   }
 
   pub fn iter<'a>(&'a self) -> RbTreeIterator<'a, K, V> {
-    println!("depth {}", m_depth(self.len)); // XXX remove
-    let mut iter = RbTreeIterator {
-      stack: std::vec::with_capacity(m_depth(self.len)),
-    };
+    let mut iter = RbTreeIterator { stack: std::vec::with_capacity(m_depth(self.len)) };
     iter.push_left_tree(self.root.as_ref());
     iter
   }
@@ -172,8 +164,9 @@ fn test_insert() {
   rbt.insert("key2", "B");
   rbt.insert("key4", "D");
   rbt.insert("key6", "F");
-  for (k, v) in rbt.iter() {
-    println!("key: {}, value: {}", *k, *v);
+  let ordered = ["A", "B", "C", "D", "E", "F"];
+  for ((_, v), expected) in rbt.iter().zip(ordered.iter()) {
+    assert_eq!(v, expected);
   }
 }
 
