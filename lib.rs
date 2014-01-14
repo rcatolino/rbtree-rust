@@ -127,10 +127,12 @@ impl<K: Ord, V> Node<K, V> {
 
 }
 
-impl<K: Ord, V> Eq for Node<K, V> {
+impl<K: Ord, V: Eq> Eq for Node<K, V> {
   fn eq(&self, other: &Node<K, V>) -> bool {
     self.key <= other.key && self.key >= other.key &&
-      self.left == other.left && self.right == other.right
+      self.data == other.data &&
+      self.left == other.left &&
+      self.right == other.right
   }
 }
 
@@ -167,7 +169,10 @@ impl<K: Ord, V> RbTree<K, V> {
           true
         };
       }
-      None => Some(~Node::new_black(key, val)),
+      None => {
+        self.len += 1;
+        Some(~Node::new_black(key, val))
+      }
     };
     true
   }
@@ -202,6 +207,9 @@ impl<K: Ord, V> RbTree<K, V> {
     true
   }
 
+}
+
+impl<K: Ord+Eq, V: Eq> RbTree<K, V> {
   /// Returns true only if both tree are identical, unlike eq()
   /// wich returns true if both tree contain the same values, even
   /// if they are aranged in a different ways in each tree.
@@ -269,10 +277,23 @@ fn test_insert() {
   rbt.insert("key4", "D");
   rbt.insert("key6", "F");
   rbt.insert("key7", "G");
-  let ordered = ["A", "B", "C", "D", "E", "F"];
+  let ordered = ["A", "B", "C", "D", "E", "F", "G"];
   for ((_, v), expected) in rbt.iter().zip(ordered.iter()) {
     assert_eq!(v, expected);
   }
+  let ref mut expected = RbTree::new();
+  expected.root = Some(~Node::new("key3", "C"));
+  expected.root.as_mut().unwrap().left = Some(~Node::new("key1", "A"));
+  expected.root.as_mut().unwrap().right = Some(~Node::new("key5", "E"));
+  expected.root.as_mut().unwrap().left.as_mut().unwrap().right = Some(~Node::new("key2", "B"));
+  {
+  let r = expected.root.as_mut().unwrap().right.as_mut().unwrap();
+  r.left = Some(~Node::new("key4", "D"));
+  r.right = Some(~Node::new("key6", "F"));
+  r.right.as_mut().unwrap().right = Some(~Node::new("key7", "G"));
+  }
+  expected.len = 7;
+  assert!(rbt.exact_eq(expected));
 }
 
 #[test]
