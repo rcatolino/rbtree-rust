@@ -62,26 +62,14 @@ impl<K: Ord, V> Node<K, V> {
     }
   }
 
+  // Fails if child doesn't exist
   fn lrotate(&mut self, what: Child) -> bool {
     // Get the parent pointer to x.
     let local_root = match what {
       Left => &mut self.left, Right => &mut self.right,
     };
 
-    // Check wether there is something to rotate.
-    if local_root.as_ref().and_then(|x| x.right.as_ref()).is_none() {
-      return false; // Either x or y is None.
-    }
-
-    // Unroot x and y.
-    let mut x = local_root.take_unwrap();
-    let mut y = x.right.take_unwrap();
-    // Rotate
-    x.right = y.left.take();
-    y.left = Some(x);
-    // Reroot
-    *local_root = Some(y);
-    true
+    RbTree::lrotate(local_root.as_mut().unwrap())
   }
 
   fn rrotate(&mut self, what: Child) -> bool {
@@ -90,16 +78,7 @@ impl<K: Ord, V> Node<K, V> {
       Left => &mut self.left, Right => &mut self.right,
     };
 
-    if local_root.as_ref().and_then(|x| x.left.as_ref()).is_none() {
-      return false;
-    }
-
-    let mut x = local_root.take_unwrap();
-    let mut y = x.left.take_unwrap();
-    x.left= y.right.take();
-    y.right= Some(x);
-    *local_root = Some(y);
-    true
+    RbTree::rrotate(local_root.as_mut().unwrap())
   }
 
   fn insert(&mut self, key: K, val: V, stack: &mut StackAcc<K, V>) -> bool {
