@@ -127,6 +127,13 @@ impl<K: Ord, V> Node<K, V> {
 
 }
 
+impl<K: Ord, V> Eq for Node<K, V> {
+  fn eq(&self, other: &Node<K, V>) -> bool {
+    self.key <= other.key && self.key >= other.key &&
+      self.left == other.left && self.right == other.right
+  }
+}
+
 pub struct RbTree<K, V> {
   root: Option<~Node<K, V>>,
   len: uint,
@@ -195,6 +202,19 @@ impl<K: Ord, V> RbTree<K, V> {
     true
   }
 
+  /// Returns true only if both tree are identical, unlike eq()
+  /// wich returns true if both tree contain the same values, even
+  /// if they are aranged in a different ways in each tree.
+  pub fn exact_eq(&self, other: &RbTree<K, V>) -> bool {
+    self.len == other.len && self.root == other.root
+  }
+}
+
+impl<K: Ord+Eq, V: Eq> Eq for RbTree<K, V> {
+  /// Returns true if both tree contain the same values.
+  fn eq(&self, other: &RbTree<K, V>) -> bool {
+    self.len == other.len && self.iter().to_owned_vec() == other.iter().to_owned_vec()
+  }
 }
 
 pub struct RbTreeIterator<'a, K, V> {
@@ -253,6 +273,53 @@ fn test_insert() {
   for ((_, v), expected) in rbt.iter().zip(ordered.iter()) {
     assert_eq!(v, expected);
   }
+}
+
+#[test]
+fn test_equality() {
+  let (t1, t2): (RbTree<~str, ~str>, RbTree<~str, ~str>) = (RbTree::new(), RbTree::new());
+  assert_eq!(t1, t1);
+  assert_eq!(t1, t2);
+  assert_eq!(t2, t2);
+  let mut t3 = RbTree::new();
+  t3.insert(~"C", ~"valueC");
+  t3.insert(~"A", ~"valueA");
+  t3.insert(~"D", ~"valueD");
+  t3.insert(~"B", ~"valueB");
+  assert!(t1 != t3);
+  let mut t4 = RbTree::new();
+  t4.insert(~"B", ~"valueB");
+  t4.insert(~"A", ~"valueA");
+  t4.insert(~"C", ~"valueC");
+  t4.insert(~"D", ~"valueD");
+  assert_eq!(t3, t4);
+}
+
+#[test]
+fn test_exact_equality() {
+  let (t1, t2): (RbTree<~str, ~str>, RbTree<~str, ~str>) = (RbTree::new(), RbTree::new());
+  assert!(t1.exact_eq(&t1));
+  assert!(t1.exact_eq(&t2));
+  assert!(t2.exact_eq(&t2));
+  let mut t3 = RbTree::new();
+  t3.insert(~"C", ~"valueC");
+  t3.insert(~"A", ~"valueA");
+  t3.insert(~"D", ~"valueD");
+  t3.insert(~"B", ~"valueB");
+  assert!(t1 != t3);
+  let mut t4 = RbTree::new();
+  t4.insert(~"B", ~"valueB");
+  t4.insert(~"A", ~"valueA");
+  t4.insert(~"C", ~"valueC");
+  t4.insert(~"D", ~"valueD");
+  assert!(!t3.exact_eq(&t4));
+  let mut t5 = RbTree::new();
+  t5.insert(~"A", ~"valueA");
+  t5.insert(~"B", ~"valueB");
+  t5.insert(~"C", ~"valueC");
+  t5.insert(~"D", ~"valueD");
+  assert!(!t3.exact_eq(&t5));
+  assert!(t4.exact_eq(&t5));
 }
 
 #[test]
