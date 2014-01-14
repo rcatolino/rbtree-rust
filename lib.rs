@@ -3,6 +3,10 @@
 
 #[cfg(target_arch = "x86_64")] #[cfg(target_arch = "x86")]
 #[inline(always)]
+
+use gstack::{StackAcc, GhostStack};
+
+mod gstack;
 // yeah, yeah i know...
 fn m_depth(n: uint) -> uint {
   unsafe {
@@ -23,9 +27,16 @@ enum Color {
   Black,
 }
 
+#[deriving(Eq)]
 enum Child {
   Left,
   Right,
+}
+
+enum NeedsRotation {
+  LRotate,
+  RRotate,
+  No,
 }
 
 struct Node<K, V> {
@@ -37,7 +48,15 @@ struct Node<K, V> {
 }
 
 impl<K: Ord, V> Node<K, V> {
+  #[inline(always)]
   fn new(key: K, val: V) -> Node<K, V> {
+    Node {
+      color: Red, data: val, key: key, left: None, right: None,
+    }
+  }
+
+  #[inline(always)]
+  fn new_black(key: K, val: V) -> Node<K, V> {
     Node {
       color: Black, data: val, key: key, left: None, right: None,
     }
@@ -61,6 +80,24 @@ impl<K: Ord, V> Node<K, V> {
     x.right = y.left.take();
     y.left = Some(x);
     // Reroot
+    *local_root = Some(y);
+    true
+  }
+
+  fn rrotate(&mut self, what: Child) -> bool {
+    // This is symmetrical to lrotate.
+    let local_root = match what {
+      Left => &mut self.left, Right => &mut self.right,
+    };
+
+    if local_root.as_ref().and_then(|x| x.left.as_ref()).is_none() {
+      return false;
+    }
+
+    let mut x = local_root.take_unwrap();
+    let mut y = x.left.take_unwrap();
+    x.left= y.right.take();
+    y.right= Some(x);
     *local_root = Some(y);
     true
   }
@@ -90,119 +127,6 @@ impl<K: Ord, V> Node<K, V> {
 
 }
 
-// What this is :
-// Well, during the insertion step we need to keep references to all the nodes
-// on the path between the root and the inserted values. We need those refs
-// to perform all modification necessary to rebalance the tree.
-// There are several ways to keep those refs.
-// - Use the call stack: Perform the tree-rebalancing while unwinding
-// from the recursive insert call. This way we use the call stack to keep
-// our references and we never have more than one mutable reference to a node.
-// - Use a separate stack: Preallocate a vector in the beginning, and add a
-// reference to each node on the path in it. The problem is, while going to
-// the insert calls we will end up with two mutable references to each node:
-// the one that's used to call the insert method, and the one in the stack.
-// ie we need to use RefCells to allow dynamic mutability. (We don't need Rc
-// since none of those refs need actual ownership).
-// - Use a ghost stack that keeps raw pointers to the nodes, bypassing the
-// borrow checker, and implement a sane api to visit the stack.
-//
-// - Method 1 is doable but gives up on sibling-call optimization
-// for insert, and yields some pretty terrible code.
-// - Method 2 works fine for insertion but makes coding the Iterator
-// a real pain. (Unless we're fine with giving the user a Ref<'a> instead
-// of a &'a, which I'm not.)
-// - Method 3 gives up on safety locally, but should be easier to implement
-// and yield better performance than the two previous methods.
-struct GhostStack<K, V> {
-  priv inner: ~[*mut Node<K, V>],
-}
-
-struct StackAcc<'a, K, V> {
-  priv inner: &'a mut ~[*mut Node<K, V>],
-}
-
-struct StackDec<'a, K, V> {
-  priv inner: StackAcc<'a, K, V>,
-}
-
-impl<K: Ord, V> GhostStack<K, V> {
-  #[inline(always)]
-  fn new(initial_capacity: uint) -> GhostStack<K, V> {
-    GhostStack {
-      inner: std::vec::with_capacity(m_depth(initial_capacity)),
-    }
-  }
-
-  #[inline(always)]
-  fn get_acc<'a>(&'a mut self) -> StackAcc<'a, K, V> {
-    StackAcc { inner: &mut self.inner }
-  }
-}
-
-impl<'a, K: Ord, V> StackAcc<'a, K, V> {
-  #[inline(always)]
-  fn push_node(&mut self, n: &mut Node<K, V>) {
-    self.inner.push(std::ptr::to_mut_unsafe_ptr(n));
-  }
-
-  fn to_dec(self) -> StackDec<'a, K, V> {
-    StackDec { inner: self }
-  }
-}
-
-#[unsafe_destructor]
-impl<'a, K: Ord, V> Drop for StackAcc<'a, K, V> {
-  fn drop(&mut self) {
-    println!("dropped stack acc");
-    self.inner.truncate(0);
-  }
-}
-
-impl<'a, K: Ord, V> StackDec<'a, K, V> {
-  #[inline]
-  fn pop_node_opt<'b>(&'b mut self) -> Option<&'b mut Node<K, V>> {
-    self.inner.inner.pop_opt().and_then(|raw_node| unsafe {
-      std::cast::transmute(raw_node)
-    })
-  }
-  #[inline]
-  fn shorten<'b>(&'b mut self, how_much: uint) {
-    let new_len = self.inner.inner.len() - how_much;
-    self.inner.inner.truncate(new_len);
-  }
-  #[inline]
-  fn current<'b>(&'b mut self) -> Option<&'b mut Node<K, V>> {
-    self.inner.inner.last_opt().and_then(|raw_node| unsafe {
-      std::cast::transmute(raw_node)
-    })
-  }
-  #[inline]
-  fn parent<'b>(&'b self) -> Option<&'b Node<K, V>> {
-    self.inner.inner.get_opt(self.inner.inner.len()-2).and_then(|raw_node| unsafe {
-      std::cast::transmute(raw_node)
-    })
-  }
-  #[inline]
-  fn grandparent<'b>(&'b self) -> Option<&'b Node<K, V>> {
-    self.inner.inner.get_opt(self.inner.inner.len()-3).and_then(|raw_node| unsafe {
-      std::cast::transmute(raw_node)
-    })
-  }
-  #[inline]
-  fn uncle<'b>(&'b self) -> Option<&'b Node<K, V>> {
-    let gp = self.grandparent().unwrap();
-    let p = self.parent().unwrap();
-    return if gp.left.is_none() {
-      None
-    } else if ptr_eq(&**gp.left.as_ref().unwrap(), p) {
-      gp.left.as_ref().map(|r| &**r)
-    } else {
-      gp.right.as_ref().map(|r| &**r)
-    }
-  }
-}
-
 pub struct RbTree<K, V> {
   root: Option<~Node<K, V>>,
   len: uint,
@@ -218,34 +142,8 @@ impl<K: Ord, V> RbTree<K, V> {
     }
   }
 
-  fn repaint<'a>(mut dec: StackDec<'a, K, V>) {
-    // Case 1.
-    if dec.parent().is_none() {
-      dec.current().unwrap().color == Black;
-      return;
-    }
-    // Case 2.
-    if dec.parent().unwrap().color == Black {
-      return;
-    }
-    if dec.uncle().map_or(false, |u| u.color == Red) {
-      // Case 3.
-      dec.shorten(2);
-      {
-        let gp = dec.current().unwrap();
-        gp.color = Red;
-        gp.left.as_mut().unwrap().color = Black;
-        gp.right.as_mut().unwrap().color = Black;
-      }
-      return RbTree::repaint(dec);
-    } else {
-    // Case 4.
-    }
-  }
-
   /// Insert a key-value pair in the tree and return true,
   /// or do nothing and return false if the key is already present.
-  #[inline(always)]
   pub fn insert(&mut self, key: K, val: V) -> bool {
     self.root = match self.root.as_mut() {
       Some(node) => {
@@ -253,11 +151,16 @@ impl<K: Ord, V> RbTree<K, V> {
         acc.push_node(&mut **node);
         return node.insert(key, val, &mut acc) && {
           self.len += 1;
-          RbTree::repaint(acc.to_dec());
+          let ret = match acc.to_dec().repaint() {
+            LRotate => RbTree::lrotate(node),
+            RRotate => RbTree::rrotate(node),
+            No => true,
+          };
+          ret || fail!();
           true
         };
       }
-      None => Some(~Node::new(key, val)),
+      None => Some(~Node::new_black(key, val)),
     };
     true
   }
@@ -268,6 +171,30 @@ impl<K: Ord, V> RbTree<K, V> {
     iter.push_left_tree(self.root.as_ref());
     iter
   }
+
+  fn lrotate(x: &mut ~Node<K, V>) -> bool {
+    // Rotation of the root
+    let mut y = match x.right.take() {
+      None => return false, Some(_y) => _y
+    };
+
+    std::util::swap(x, &mut y);
+    std::util::swap(&mut y.right, &mut x.left);
+    x.left = Some(y);
+    true
+  }
+
+  fn rrotate(x: &mut ~Node<K, V>) -> bool {
+    let mut y = match x.left.take() {
+      None => return false, Some(_y) => _y
+    };
+
+    std::util::swap(x, &mut y);
+    std::util::swap(&mut y.left, &mut x.right);
+    x.right = Some(y);
+    true
+  }
+
 }
 
 pub struct RbTreeIterator<'a, K, V> {
@@ -321,10 +248,19 @@ fn test_insert() {
   rbt.insert("key2", "B");
   rbt.insert("key4", "D");
   rbt.insert("key6", "F");
+  rbt.insert("key7", "G");
   let ordered = ["A", "B", "C", "D", "E", "F"];
   for ((_, v), expected) in rbt.iter().zip(ordered.iter()) {
     assert_eq!(v, expected);
   }
+}
+
+#[test]
+fn test_root_lrotate() {
+}
+
+#[test]
+fn test_root_rrotate() {
 }
 
 #[test]
