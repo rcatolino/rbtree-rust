@@ -62,6 +62,33 @@ impl<K: Ord, V> Node<K, V> {
     }
   }
 
+  fn find_mut<'a>(&'a mut self, key: &K) -> Option<&'a mut V> {
+    match if key < &self.key {
+      self.left.as_mut()
+    } else if key > &self.key {
+      self.right.as_mut()
+    } else {
+      return Some(&mut self.data);
+    } {
+      Some(node) => return node.find_mut(key),
+      None => None,
+    }
+  }
+
+  fn find<'a>(&'a self, key: &K) -> Option<&'a V> {
+    match if key < &self.key {
+      self.left.as_ref()
+    } else if key > &self.key {
+      self.right.as_ref()
+    } else {
+      return Some(&self.data);
+    } {
+      Some(node) => return node.find(key),
+      None => None,
+    }
+  }
+
+
   // Fails if child doesn't exist
   fn lrotate(&mut self, what: Child) -> bool {
     // Get the parent pointer to x.
@@ -219,6 +246,12 @@ impl<K: Ord+Eq, V: Eq> Eq for RbTree<K, V> {
   /// Returns true if both tree contain the same values.
   fn eq(&self, other: &RbTree<K, V>) -> bool {
     self.len == other.len && self.iter().to_owned_vec() == other.iter().to_owned_vec()
+  }
+}
+
+impl<K: Ord, V> Map<K, V> for RbTree<K, V> {
+  fn find<'a>(&'a self, key: &K) -> Option<&'a V> {
+    self.root.as_ref().and_then(|node| node.find(key))
   }
 }
 
@@ -390,5 +423,11 @@ fn test_root_rrotate() {
 }
 
 #[test]
-fn test_search() {
+fn test_find() {
+  let mut rbt = RbTree::new();
+  rbt.insert(~"key3", ~"C");
+  rbt.insert(~"key1", ~"A");
+  rbt.insert(~"key2", ~"B");
+  rbt.find(&~"key1").unwrap() == &~"A" || fail!();
+  rbt.find(&~"key4").is_none() || fail!();
 }
