@@ -324,10 +324,38 @@ fn test_exact_equality() {
 
 #[test]
 fn test_root_lrotate() {
+  let ref mut tree = RbTree::new();
+  tree.root = Some(~Node::new("X", "X"));
+  tree.root.as_mut().unwrap().left = Some(~Node::new("A", "A"));
+  tree.root.as_mut().unwrap().right = Some(~Node::new("Y", "Y"));
+  tree.root.as_mut().unwrap().right.as_mut().unwrap().left = Some(~Node::new("B", "B"));
+  tree.root.as_mut().unwrap().right.as_mut().unwrap().right = Some(~Node::new("C", "C"));
+  let ref mut expected = RbTree::new();
+  expected.root = Some(~Node::new("Y", "Y"));
+  expected.root.as_mut().unwrap().left = Some(~Node::new("X", "X"));
+  expected.root.as_mut().unwrap().left.as_mut().unwrap().left = Some(~Node::new("A", "A"));
+  expected.root.as_mut().unwrap().left.as_mut().unwrap().right = Some(~Node::new("B", "B"));
+  expected.root.as_mut().unwrap().right = Some(~Node::new("C", "C"));
+  RbTree::lrotate(tree.root.as_mut().unwrap());
+  assert!(tree.exact_eq(expected));
 }
 
 #[test]
 fn test_root_rrotate() {
+  let ref mut tree = RbTree::new();
+  tree.root = Some(~Node::new("Y", "Y"));
+  tree.root.as_mut().unwrap().left = Some(~Node::new("X", "X"));
+  tree.root.as_mut().unwrap().left.as_mut().unwrap().left = Some(~Node::new("A", "A"));
+  tree.root.as_mut().unwrap().left.as_mut().unwrap().right = Some(~Node::new("B", "B"));
+  tree.root.as_mut().unwrap().right = Some(~Node::new("C", "C"));
+  let ref mut expected = RbTree::new();
+  expected.root = Some(~Node::new("X", "X"));
+  expected.root.as_mut().unwrap().left = Some(~Node::new("A", "A"));
+  expected.root.as_mut().unwrap().right = Some(~Node::new("Y", "Y"));
+  expected.root.as_mut().unwrap().right.as_mut().unwrap().left = Some(~Node::new("B", "B"));
+  expected.root.as_mut().unwrap().right.as_mut().unwrap().right = Some(~Node::new("C", "C"));
+  RbTree::rrotate(tree.root.as_mut().unwrap());
+  assert!(tree.exact_eq(expected));
 }
 
 #[test]
