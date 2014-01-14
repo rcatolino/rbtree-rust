@@ -81,13 +81,14 @@ impl<K: Ord, V> Node<K, V> {
     RbTree::rrotate(local_root.as_mut().unwrap())
   }
 
-  fn insert(&mut self, key: K, val: V, stack: &mut StackAcc<K, V>) -> bool {
+  fn insert(&mut self, key: K, mut val: V, stack: &mut StackAcc<K, V>) -> Option<V> {
     let child_opt = if key < self.key {
       &mut self.left
     } else if key > self.key {
       &mut self.right
     } else {
-      return false;
+      std::util::swap(&mut self.data, &mut val);
+      return Some(val);
     };
 
     *child_opt = match child_opt.as_mut() {
@@ -101,7 +102,7 @@ impl<K: Ord, V> Node<K, V> {
         return child.insert(key, val, stack);
       }
     };
-    true
+    None
   }
 
 }
@@ -132,20 +133,24 @@ impl<K: Ord, V> RbTree<K, V> {
 
   /// Insert a key-value pair in the tree and return true,
   /// or do nothing and return false if the key is already present.
-  pub fn insert(&mut self, key: K, val: V) -> bool {
+  pub fn insert(&mut self, key: K, val: V) -> Option<V> {
     self.root = match self.root.as_mut() {
       Some(node) => {
         let mut acc = self.gstack.get_acc();
         acc.push_node(&mut **node);
-        return node.insert(key, val, &mut acc) && {
-          self.len += 1;
-          let ret = match acc.to_dec().repaint() {
-            LRotate => RbTree::lrotate(node),
-            RRotate => RbTree::rrotate(node),
-            No => true,
-          };
-          ret || fail!();
-          true
+        return match node.insert(key, val, &mut acc) {
+          ret @ Some(_) => ret,
+          None => {
+            self.len += 1;
+            if !match acc.to_dec().repaint() {
+              LRotate => RbTree::lrotate(node),
+              RRotate => RbTree::rrotate(node),
+              No => true,
+            } {
+              fail!();
+            }
+            None
+          }
         };
       }
       None => {
@@ -153,7 +158,7 @@ impl<K: Ord, V> RbTree<K, V> {
         Some(~Node::new_black(key, val))
       }
     };
-    true
+    None
   }
 
   #[inline(always)]
@@ -194,6 +199,19 @@ impl<K: Ord+Eq, V: Eq> RbTree<K, V> {
   /// if they are aranged in a different ways in each tree.
   pub fn exact_eq(&self, other: &RbTree<K, V>) -> bool {
     self.len == other.len && self.root == other.root
+  }
+}
+
+impl<K, V> Container for RbTree<K, V> {
+  fn len(&self) -> uint {
+    self.len
+  }
+}
+
+impl<K, V> Mutable for RbTree<K, V> {
+  fn clear(&mut self) {
+    self.root.take();
+    self.len = 0;
   }
 }
 
@@ -273,6 +291,19 @@ fn test_insert() {
   }
   expected.len = 7;
   assert!(rbt.exact_eq(expected));
+}
+
+#[test]
+fn test_swap() {
+  let mut rbt = RbTree::new();
+  rbt.insert("key3", "C");
+  rbt.insert("key1", "A");
+  rbt.insert("key2", "B").is_none() || fail!();
+  rbt.insert("key1", "AA").unwrap() == "A" || fail!();
+  let ordered = ["AA", "B", "C"];
+  for ((_, v), expected) in rbt.iter().zip(ordered.iter()) {
+    assert_eq!(v, expected);
+  }
 }
 
 #[test]
