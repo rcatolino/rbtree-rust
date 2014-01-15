@@ -47,6 +47,50 @@ struct Node<K, V> {
   right: Option<~Node<K, V>>,
 }
 
+trait Colored<K, V> {
+  fn color(&self) -> Color;
+  fn paint(&mut self, Color) -> bool;
+  fn insert(&mut self, key: K, value: V) -> (Option<V>, NeedsRotation);
+}
+
+impl<K: Ord, V> Colored<K, V> for Option<~Node<K, V>> {
+  fn color(&self) -> Color {
+    self.as_ref().map_or(Black, |n| n.color)
+  }
+
+  // Returns true if the node could be painted.
+  fn paint(&mut self, c: Color) -> bool {
+    self.as_mut().map_or(false, |n| {n.color = c; true})
+  }
+
+  fn insert(&mut self, key: K, val: V) -> (Option<V>, NeedsRotation) {
+    match self {
+      this @ &None => {
+        *this = Some(~Node::new(key, val));
+        (None, No)
+      }
+      &Some(ref mut node) => {
+        if node.left.color() == Red && node.right.color() == Red {
+          // This is a 4-node, split it to make sure the search does not
+          // terminate on a 4-node.
+          node.color = Red;
+          node.left.paint(Black);
+          node.right.paint(Black);
+        }
+        (node.insert(key, val),
+        if node.right.color() == Red && node.left.color() == Black {
+          LRotate
+        } else if node.left.color() == Red &&
+                  node.left.as_ref().map_or(Black, |n| n.left.color()) == Red {
+          RRotate
+        } else {
+          No
+        })
+      }
+    }
+  }
+}
+
 impl<K: Ord, V> Node<K, V> {
   #[inline(always)]
   fn new(key: K, val: V) -> Node<K, V> {
@@ -108,28 +152,35 @@ impl<K: Ord, V> Node<K, V> {
     RbTree::rrotate(local_root.as_mut().unwrap())
   }
 
-  fn insert(&mut self, key: K, mut val: V, stack: &mut StackAcc<K, V>) -> Option<V> {
-    let child_opt = if key < self.key {
-      &mut self.left
+  fn insert(&mut self, key: K, mut val: V) -> Option<V> {
+    match if key < self.key {
+      (Left, self.left.insert(key, val))
     } else if key > self.key {
-      &mut self.right
+      (Right, self.right.insert(key, val))
     } else {
       std::util::swap(&mut self.data, &mut val);
-      return Some(val);
-    };
+      return Some(val)
+    } {
+      (side, (ret, LRotate)) => {
+        self.lrotate(side);
+        ret
+      }
+      (side, (ret, RRotate)) => {
+        self.rrotate(side);
+        ret
+      }
+      (_, (ret, No)) => ret,
+    }
+  }
 
-    *child_opt = match child_opt.as_mut() {
-      None => {
-        let mut new = ~Node::new(key, val);
-        stack.push_node(&mut *new);
-        Some(new)
-      }
-      Some(child) => {
-        stack.push_node(&mut **child);
-        return child.insert(key, val, stack);
-      }
-    };
-    None
+  fn print(&self) {
+    print!("{:?}({:?}) -> ", self.color, self.data);
+    self.left.as_ref().map(|n| print!("{:?}({:?}) , ", n.color, n.data));
+    self.right.as_ref().map(|n| print!(" , {:?}({:?})", n.color, n.data));
+    print!("\n");
+    self.left.as_ref().map(|n| n.print());
+    self.right.as_ref().map(|n| n.print());
+    print!("\n");
   }
 
 }
@@ -161,14 +212,30 @@ impl<K: Ord, V> RbTree<K, V> {
   /// Insert a key-value pair in the tree and return true,
   /// or do nothing and return false if the key is already present.
   pub fn insert(&mut self, key: K, val: V) -> Option<V> {
+    let ret = match self.root.insert(key, val) {
+      (ret, RRotate) => {
+        RbTree::rrotate(self.root.as_mut().unwrap());
+        ret
+      }
+      (ret, LRotate) => {
+        RbTree::lrotate(self.root.as_mut().unwrap());
+        ret
+      }
+      (ret, No) => ret,
+    }.or_else(|| {
+      self.len += 1;
+      None
+    });
+    self.root.paint(Black);
+    ret
+    /*
     self.root = match self.root.as_mut() {
       Some(node) => {
-        let mut acc = self.gstack.get_acc();
-        acc.push_node(&mut **node);
-        return match node.insert(key, val, &mut acc) {
+        return match node.insert(key, val) {
           ret @ Some(_) => ret,
           None => {
             self.len += 1;
+            /*
             if !match acc.to_dec().repaint() {
               LRotate => RbTree::lrotate(node),
               RRotate => RbTree::rrotate(node),
@@ -176,6 +243,7 @@ impl<K: Ord, V> RbTree<K, V> {
             } {
               fail!();
             }
+            */
             None
           }
         };
@@ -186,6 +254,7 @@ impl<K: Ord, V> RbTree<K, V> {
       }
     };
     None
+    */
   }
 
   #[inline(always)]
@@ -203,6 +272,8 @@ impl<K: Ord, V> RbTree<K, V> {
 
     std::util::swap(x, &mut y);
     std::util::swap(&mut y.right, &mut x.left);
+    x.color = y.color;
+    y.color = Red;
     x.left = Some(y);
     true
   }
@@ -214,6 +285,8 @@ impl<K: Ord, V> RbTree<K, V> {
 
     std::util::swap(x, &mut y);
     std::util::swap(&mut y.left, &mut x.right);
+    x.color = y.color;
+    y.color = Red;
     x.right = Some(y);
     true
   }
@@ -312,15 +385,15 @@ fn test_insert() {
     assert_eq!(v, expected);
   }
   let ref mut expected = RbTree::new();
-  expected.root = Some(~Node::new("key3", "C"));
-  expected.root.as_mut().unwrap().left = Some(~Node::new("key1", "A"));
-  expected.root.as_mut().unwrap().right = Some(~Node::new("key5", "E"));
-  expected.root.as_mut().unwrap().left.as_mut().unwrap().right = Some(~Node::new("key2", "B"));
+  expected.root = Some(~Node::new("key5", "E"));
+  expected.root.as_mut().unwrap().left = Some(~Node::new("key3", "C"));
+  expected.root.as_mut().unwrap().right = Some(~Node::new("key7", "G"));
+  expected.root.as_mut().unwrap().right.as_mut().unwrap().left = Some(~Node::new("key6", "F"));
   {
-  let r = expected.root.as_mut().unwrap().right.as_mut().unwrap();
-  r.left = Some(~Node::new("key4", "D"));
-  r.right = Some(~Node::new("key6", "F"));
-  r.right.as_mut().unwrap().right = Some(~Node::new("key7", "G"));
+  let r = expected.root.as_mut().unwrap().left.as_mut().unwrap();
+  r.right = Some(~Node::new("key4", "D"));
+  r.left = Some(~Node::new("key2", "B"));
+  r.left.as_mut().unwrap().left = Some(~Node::new("key1", "A"));
   }
   expected.len = 7;
   assert!(rbt.exact_eq(expected));
@@ -382,6 +455,8 @@ fn test_exact_equality() {
   t5.insert(~"B", ~"valueB");
   t5.insert(~"C", ~"valueC");
   t5.insert(~"D", ~"valueD");
+  t3.root.as_ref().unwrap().print();
+  t5.root.as_ref().unwrap().print();
   assert!(!t3.exact_eq(&t5));
   assert!(t4.exact_eq(&t5));
 }

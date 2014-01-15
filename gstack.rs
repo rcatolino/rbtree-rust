@@ -1,4 +1,4 @@
-use super::{Child, Left, Right, Black, Red, No, LRotate, RRotate,
+use super::{Colored, Child, Left, Right, Black, Red, No, LRotate, RRotate,
             NeedsRotation, Node, m_depth, ptr_eq};
 use std::vec::with_capacity;
 use std::ptr::to_mut_unsafe_ptr;
@@ -123,6 +123,19 @@ impl<'a, K: Ord, V> StackDec<'a, K, V> {
   }
 
   pub fn repaint(mut self) -> NeedsRotation {
+    let p = self.parent();
+    match p {
+      Some(node) => if node.right.color() == Red && node.left.color() == Black {
+        return No;
+      } else if node.left.color() == Red &&
+                node.left.as_ref().map_or(Black, |n| n.left.color()) == Red {
+        return No;
+      } else {
+        return No;
+      },
+      None => return No,
+    }
+    /*
     // Case 1.
     if self.parent().is_none() {
       self.current().unwrap().color = Black;
@@ -186,6 +199,7 @@ impl<'a, K: Ord, V> StackDec<'a, K, V> {
         return LRotate;
       }
     }
+      */
   }
 }
 
