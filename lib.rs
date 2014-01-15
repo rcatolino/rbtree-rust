@@ -124,7 +124,7 @@ impl<K: Ord, V> Colored<K, V> for Option<~Node<K, V>> {
         }
         {
           let node  = self.as_mut().unwrap();
-          if node.right.color() == Black &&
+          if node.right.is_some() && node.right.color() == Black &&
              node.right.as_ref().map_or(Black, |n| n.left.color()) == Black {
             node.moveRedRight();
           }
@@ -568,9 +568,9 @@ fn test_pop() {
   rbt.insert(~"key6", ~"F");
   rbt.pop(&~"key3").unwrap() == ~"C" || fail!();
   rbt.root.as_ref().unwrap().print();
-  /*
   rbt.pop(&~"notakey").is_none() || fail!();
   rbt.root.as_ref().unwrap().print();
+  /*
   rbt.pop(&~"key9").unwrap() == ~"I" || fail!();
   rbt.root.as_ref().unwrap().print();
   */
