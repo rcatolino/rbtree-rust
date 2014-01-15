@@ -3,8 +3,8 @@
 
 extern mod extra;
 
+#[inline]
 #[cfg(target_arch = "x86_64")] #[cfg(target_arch = "x86")]
-#[inline(always)]
 // yeah, yeah i know...
 fn m_depth(n: uint) -> uint {
   unsafe {
@@ -14,7 +14,7 @@ fn m_depth(n: uint) -> uint {
   }
 }
 
-#[inline(always)]
+#[inline]
 fn ptr_eq<T>(t1: &T, t2: &T) -> bool {
   std::ptr::to_unsafe_ptr(t1) == std::ptr::to_unsafe_ptr(t2)
 }
@@ -52,11 +52,13 @@ trait Colored<K, V> {
 }
 
 impl<K: Ord, V> Colored<K, V> for Option<~Node<K, V>> {
+  #[inline(always)]
   fn color(&self) -> Color {
     self.as_ref().map_or(Black, |n| n.color)
   }
 
   // Returns true if the node could be painted.
+  #[inline(always)]
   fn paint(&mut self, c: Color) -> bool {
     self.as_mut().map_or(false, |n| {n.color = c; true})
   }
@@ -90,7 +92,7 @@ impl<K: Ord, V> Colored<K, V> for Option<~Node<K, V>> {
 }
 
 impl<K: Ord, V> Node<K, V> {
-  #[inline(always)]
+  #[inline]
   fn new(key: K, val: V) -> Node<K, V> {
     Node {
       color: Red, data: val, key: key, left: None, right: None,
@@ -124,6 +126,7 @@ impl<K: Ord, V> Node<K, V> {
   }
 
 
+
   // Fails if child doesn't exist
   fn lrotate(&mut self, what: Child) -> bool {
     // Get the parent pointer to x.
@@ -143,7 +146,7 @@ impl<K: Ord, V> Node<K, V> {
     RbTree::rrotate(local_root.as_mut().unwrap())
   }
 
-  #[inline]
+  #[inline(always)]
   fn insert(&mut self, key: K, mut val: V) -> Option<V> {
     match if key < self.key {
       (Left, self.left.insert(key, val))
@@ -193,7 +196,6 @@ pub struct RbTree<K, V> {
 
 impl<K: Ord, V> RbTree<K, V> {
   /// Creates a new red-black tree.
-  #[inline(always)]
   pub fn new() -> RbTree<K, V> {
     RbTree {
       root: None, len: 0,
@@ -219,42 +221,15 @@ impl<K: Ord, V> RbTree<K, V> {
     });
     self.root.paint(Black);
     ret
-    /*
-    self.root = match self.root.as_mut() {
-      Some(node) => {
-        return match node.insert(key, val) {
-          ret @ Some(_) => ret,
-          None => {
-            self.len += 1;
-            /*
-            if !match acc.to_dec().repaint() {
-              LRotate => RbTree::lrotate(node),
-              RRotate => RbTree::rrotate(node),
-              No => true,
-            } {
-              fail!();
-            }
-            */
-            None
-          }
-        };
-      }
-      None => {
-        self.len += 1;
-        Some(~Node::new_black(key, val))
-      }
-    };
-    None
-    */
   }
 
-  #[inline(always)]
   pub fn iter<'a>(&'a self) -> RbTreeIterator<'a, K, V> {
     let mut iter = RbTreeIterator { stack: std::vec::with_capacity(m_depth(self.len)) };
     iter.push_left_tree(self.root.as_ref());
     iter
   }
 
+  #[inline(always)]
   fn lrotate(x: &mut ~Node<K, V>) -> bool {
     // Rotation of the root
     let mut y = match x.right.take() {
@@ -269,6 +244,7 @@ impl<K: Ord, V> RbTree<K, V> {
     true
   }
 
+  #[inline(always)]
   fn rrotate(x: &mut ~Node<K, V>) -> bool {
     let mut y = match x.left.take() {
       None => return false, Some(_y) => _y
@@ -314,6 +290,7 @@ impl<K: Ord+Eq, V: Eq> Eq for RbTree<K, V> {
 }
 
 impl<K: Ord, V> Map<K, V> for RbTree<K, V> {
+  #[inline]
   fn find<'a>(&'a self, key: &K) -> Option<&'a V> {
     self.root.as_ref().and_then(|node| node.find(key))
   }
@@ -324,7 +301,6 @@ pub struct RbTreeIterator<'a, K, V> {
 }
 
 impl<'tree, K: Ord, V> RbTreeIterator<'tree, K, V> {
-  #[inline(always)]
   fn push_left_tree(&mut self, root: Option<&'tree ~Node<K, V>>) {
     root.while_some(|node_ref| {
       self.stack.push(&**node_ref);
@@ -332,7 +308,6 @@ impl<'tree, K: Ord, V> RbTreeIterator<'tree, K, V> {
     });
   }
 
-  #[inline(always)]
   fn pop_left_tree(&mut self, n: &'tree Node<K, V>) {
     let mut lchild = n;
     self.stack.pop_opt().while_some(|last| {
