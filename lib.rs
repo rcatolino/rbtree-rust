@@ -1,9 +1,10 @@
 #[crate_id = "rbtree"];
 #[feature(asm)];
 
+extern mod extra;
+
 #[cfg(target_arch = "x86_64")] #[cfg(target_arch = "x86")]
 #[inline(always)]
-
 // yeah, yeah i know...
 fn m_depth(n: uint) -> uint {
   unsafe {
@@ -496,3 +497,16 @@ fn test_find() {
   rbt.find(&~"key1").unwrap() == &~"A" || fail!();
   rbt.find(&~"key4").is_none() || fail!();
 }
+
+#[bench]
+fn bench_insertion(b: &mut extra::test::BenchHarness) {
+  use std::rand;
+  use std::rand::Rng;
+  let mut rng = rand::rng();
+  let mut rbt = RbTree::new();
+  b.iter(|| {
+    rbt.insert(rng.gen::<int>(), 1);
+  });
+}
+
+
