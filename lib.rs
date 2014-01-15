@@ -509,4 +509,18 @@ fn bench_insertion(b: &mut extra::test::BenchHarness) {
   });
 }
 
+#[bench]
+fn bench_find(b: &mut extra::test::BenchHarness) {
+  use std::rand;
+  use std::rand::Rng;
+  let mut rng = rand::rng();
+  let mut rbt = RbTree::new();
+  for i in range(0, 100) {
+    rbt.insert(rng.gen_range(-100i, 100), i);
+  }
+
+  b.iter(|| {
+    rbt.find(&rng.gen_range(-100i, 100));
+  });
+}
 
