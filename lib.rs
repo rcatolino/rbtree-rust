@@ -4,9 +4,6 @@
 #[cfg(target_arch = "x86_64")] #[cfg(target_arch = "x86")]
 #[inline(always)]
 
-use gstack::{StackAcc, GhostStack};
-
-mod gstack;
 // yeah, yeah i know...
 fn m_depth(n: uint) -> uint {
   unsafe {
@@ -99,13 +96,6 @@ impl<K: Ord, V> Node<K, V> {
     }
   }
 
-  #[inline(always)]
-  fn new_black(key: K, val: V) -> Node<K, V> {
-    Node {
-      color: Black, data: val, key: key, left: None, right: None,
-    }
-  }
-
   fn find_mut<'a>(&'a mut self, key: &K) -> Option<&'a mut V> {
     match if key < &self.key {
       self.left.as_mut()
@@ -152,6 +142,7 @@ impl<K: Ord, V> Node<K, V> {
     RbTree::rrotate(local_root.as_mut().unwrap())
   }
 
+  #[inline]
   fn insert(&mut self, key: K, mut val: V) -> Option<V> {
     match if key < self.key {
       (Left, self.left.insert(key, val))
@@ -197,7 +188,6 @@ impl<K: Ord, V: Eq> Eq for Node<K, V> {
 pub struct RbTree<K, V> {
   root: Option<~Node<K, V>>,
   len: uint,
-  gstack: GhostStack<K, V>,
 }
 
 impl<K: Ord, V> RbTree<K, V> {
@@ -205,7 +195,7 @@ impl<K: Ord, V> RbTree<K, V> {
   #[inline(always)]
   pub fn new() -> RbTree<K, V> {
     RbTree {
-      root: None, len: 0, gstack: GhostStack::new(16),
+      root: None, len: 0,
     }
   }
 
