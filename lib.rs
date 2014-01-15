@@ -42,6 +42,7 @@ struct Node<K, V> {
 trait Colored<K, V> {
   fn color(&self) -> Color;
   fn paint(&mut self, Color) -> bool;
+  fn switch_color(&mut self) -> bool;
   fn insert(&mut self, key: K, value: V) -> Option<V>;
   fn pop(&mut self, key: &K) -> Option<V>;
   fn popMin(&mut self) -> ~Node<K, V>;
@@ -59,6 +60,17 @@ impl<K: Ord, V> Colored<K, V> for Option<~Node<K, V>> {
     self.as_mut().map_or(false, |n| {n.color = c; true})
   }
 
+  fn switch_color(&mut self) -> bool {
+    self.as_mut().map_or(false, |n| {
+      if n.color == Red {
+        n.color = Black;
+      } else {
+        n.color = Red;
+      }
+      true
+    })
+  }
+
   fn insert(&mut self, key: K, val: V) -> Option<V> {
     match self {
       &None => {
@@ -66,9 +78,6 @@ impl<K: Ord, V> Colored<K, V> for Option<~Node<K, V>> {
         None
       }
       &Some(ref mut node) => {
-        if node.left.color() == Red && node.right.color() == Red {
-          node.color_flip_black();
-        }
         let ret = node.insert(key, val);
         node.fix();
         ret
@@ -82,7 +91,7 @@ impl<K: Ord, V> Colored<K, V> for Option<~Node<K, V>> {
       self.take().unwrap()
     } else {
       let node = self.as_mut().unwrap();
-      if node.left.color() == Red &&
+      if node.left.color() == Black &&
          node.left.as_ref().map_or(Black, |n| n.left.color()) == Black {
         node.moveRedLeft();
       }
@@ -98,8 +107,8 @@ impl<K: Ord, V> Colored<K, V> for Option<~Node<K, V>> {
       &Some(_) => {
         if *key < self.as_ref().unwrap().key {
           let node = self.as_mut().unwrap();
-          if node.left.color() == Red &&
-             node.left.as_ref().map_or(Black, |n| n.left.color()) == Red {
+          if node.left.color() == Black &&
+             node.left.as_ref().map_or(Black, |n| n.left.color()) == Black {
             node.moveRedLeft();
           }
           let ret = node.left.pop(key);
@@ -194,11 +203,15 @@ impl<K: Ord, V> NodeRef for ~Node<K, V> {
   }
 
   fn fix(&mut self) {
-    if self.right.color() == Red && self.left.color() == Black {
+    if self.right.color() == Red {
       self.lrotate();
-    } else if self.left.color() == Red &&
+    }
+    if self.left.color() == Red &&
               self.left.as_ref().map_or(Black, |n| n.left.color()) == Red {
       self.rrotate();
+    }
+    if self.left.color() == Red && self.right.color() == Red {
+      self.color_flip();
     }
   }
 }
@@ -224,11 +237,11 @@ impl<K: Ord, V> Node<K, V> {
   fn color_flip(&mut self) {
     if self.color == Red {
       self.color = Black;
-      self.left.paint(Red);
-      self.right.paint(Red);
     } else {
-      self.color_flip_black()
+      self.color = Red;
     }
+    self.left.switch_color();
+    self.right.switch_color();
   }
 
   fn find_mut<'a>(&'a mut self, key: &K) -> Option<&'a mut V> {
@@ -306,10 +319,10 @@ impl<K: Ord, V> RbTree<K, V> {
   /// Insert a key-value pair in the tree and return true,
   /// or do nothing and return false if the key is already present.
   pub fn insert(&mut self, key: K, val: V) -> Option<V> {
-    let ret = self.root.insert(key, val).or_else(|| {
+    let ret = self.root.insert(key, val);
+    if ret.is_none() {
       self.len += 1;
-      None
-    });
+    }
     self.root.paint(Black);
     ret
   }
@@ -320,6 +333,14 @@ impl<K: Ord, V> RbTree<K, V> {
     iter
   }
 
+  pub fn pop(&mut self, key: &K) -> Option<V> {
+    let ret = self.root.pop(key);
+    if ret.is_some() {
+      self.len -= 1;
+    }
+    self.root.paint(Black);
+    ret
+  }
 }
 
 impl<K: Ord+Eq, V: Eq> RbTree<K, V> {
@@ -531,6 +552,32 @@ fn test_find() {
   rbt.insert(~"key2", ~"B");
   rbt.find(&~"key1").unwrap() == &~"A" || fail!();
   rbt.find(&~"key4").is_none() || fail!();
+}
+
+#[test]
+fn test_pop() {
+  let mut rbt = RbTree::new();
+  rbt.insert(~"key7", ~"G");
+  rbt.insert(~"key1", ~"A");
+  rbt.insert(~"key3", ~"C");
+  rbt.insert(~"key8", ~"H");
+  rbt.insert(~"key2", ~"B");
+  rbt.insert(~"key4", ~"D");
+  rbt.insert(~"key5", ~"E");
+  rbt.insert(~"key9", ~"I");
+  rbt.insert(~"key6", ~"F");
+  rbt.pop(&~"key3").unwrap() == ~"C" || fail!();
+  rbt.root.as_ref().unwrap().print();
+  /*
+  rbt.pop(&~"notakey").is_none() || fail!();
+  rbt.root.as_ref().unwrap().print();
+  rbt.pop(&~"key9").unwrap() == ~"I" || fail!();
+  rbt.root.as_ref().unwrap().print();
+  */
+  rbt.pop(&~"key1").unwrap() == ~"A" || fail!();
+  rbt.root.as_ref().unwrap().print();
+  rbt.pop(&~"key5").unwrap() == ~"E" || fail!();
+  rbt.root.as_ref().unwrap().print();
 }
 
 #[bench]
