@@ -292,6 +292,38 @@ impl<K: Ord, V> Node<K, V> {
     print!("\n");
   }
 
+  fn is_sound(&self) -> Result<~[uint], ~str> {
+    let mut result = self.left.as_ref().map_or(Ok(~[]), |left| {
+      if self.color == Red && left.color == Red {
+        Err(format!("2 Red nodes in a raw : {:?} -> {:?}", self.data, left.data))
+      } else {
+        left.is_sound()
+      }
+    }).and_then(|mut lbh| {
+      match self.right.as_ref().map_or(Ok(~[]), |right| {
+        if right.color == Red {
+          Err(format!("Right leaning red node : {:?} -> {:?}", self.data, right.data))
+        } else {
+          right.is_sound()
+        }
+      }) {
+        Ok(rbh) => {lbh.push_all_move(rbh); Ok(lbh)}, Err(msg) => Err(msg),
+      }
+    });
+    result.as_mut().map(|bh| {
+      if bh.is_empty() {
+        // This is a leaf node.
+        bh.push(0);
+      }
+      if self.color == Black {
+        for height in bh.mut_iter() {
+          *height += 1;
+        }
+      }
+      bh
+    });
+    return result;
+  }
 }
 
 impl<K: Ord, V: Eq> Eq for Node<K, V> {
@@ -340,6 +372,26 @@ impl<K: Ord, V> RbTree<K, V> {
     }
     self.root.paint(Black);
     ret
+  }
+
+  fn is_sound(&self) -> bool {
+    let sound = self.root.as_ref().map_or(Ok(~[]), |n| n.is_sound());
+    match sound {
+      Ok(black_heights) => {
+        for i in black_heights.iter() {
+          if *i != black_heights[0] {
+            println!("Unequals black heights. {:?}", black_heights);
+            self.root.as_ref().unwrap().print();
+            return false;
+          }
+        }
+        return true;
+      }
+      Err(msg) => {
+        println!("{}", msg);
+        return false;
+      }
+    }
   }
 }
 
@@ -423,12 +475,19 @@ impl<'tree, K: Ord, V> Iterator<(&'tree K, &'tree V)> for RbTreeIterator<'tree, 
 fn test_insert() {
   let mut rbt = RbTree::new();
   rbt.insert("key5", "E");
+  rbt.is_sound() || fail!();
   rbt.insert("key1", "A");
+  rbt.is_sound() || fail!();
   rbt.insert("key3", "C");
+  rbt.is_sound() || fail!();
   rbt.insert("key2", "B");
+  rbt.is_sound() || fail!();
   rbt.insert("key4", "D");
+  rbt.is_sound() || fail!();
   rbt.insert("key6", "F");
+  rbt.is_sound() || fail!();
   rbt.insert("key7", "G");
+  rbt.is_sound() || fail!();
   let ordered = ["A", "B", "C", "D", "E", "F", "G"];
   for ((_, v), expected) in rbt.iter().zip(ordered.iter()) {
     assert_eq!(v, expected);
@@ -454,7 +513,9 @@ fn test_swap() {
   rbt.insert("key3", "C");
   rbt.insert("key1", "A");
   rbt.insert("key2", "B").is_none() || fail!();
+  rbt.is_sound() || fail!();
   rbt.insert("key1", "AA").unwrap() == "A" || fail!();
+  rbt.is_sound() || fail!();
   let ordered = ["AA", "B", "C"];
   for ((_, v), expected) in rbt.iter().zip(ordered.iter()) {
     assert_eq!(v, expected);
@@ -552,6 +613,7 @@ fn test_find() {
   rbt.insert(~"key2", ~"B");
   rbt.find(&~"key1").unwrap() == &~"A" || fail!();
   rbt.find(&~"key4").is_none() || fail!();
+  rbt.is_sound() || fail!();
 }
 
 #[test]
@@ -566,18 +628,17 @@ fn test_pop() {
   rbt.insert(~"key5", ~"E");
   rbt.insert(~"key9", ~"I");
   rbt.insert(~"key6", ~"F");
+  rbt.is_sound() || fail!();
   rbt.pop(&~"key3").unwrap() == ~"C" || fail!();
-  rbt.root.as_ref().unwrap().print();
+  rbt.is_sound() || fail!();
   rbt.pop(&~"notakey").is_none() || fail!();
-  rbt.root.as_ref().unwrap().print();
-  /*
+  rbt.is_sound() || fail!();
   rbt.pop(&~"key9").unwrap() == ~"I" || fail!();
-  rbt.root.as_ref().unwrap().print();
-  */
+  rbt.is_sound() || fail!();
   rbt.pop(&~"key1").unwrap() == ~"A" || fail!();
-  rbt.root.as_ref().unwrap().print();
+  rbt.is_sound() || fail!();
   rbt.pop(&~"key5").unwrap() == ~"E" || fail!();
-  rbt.root.as_ref().unwrap().print();
+  rbt.is_sound() || fail!();
 }
 
 #[bench]
