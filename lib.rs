@@ -207,7 +207,7 @@ impl<K: Ord, V> NodeRef for ~Node<K, V> {
       self.lrotate();
     }
     if self.left.color() == Red &&
-              self.left.as_ref().map_or(Black, |n| n.left.color()) == Red {
+       self.left.as_ref().map_or(Black, |n| n.left.color()) == Red {
       self.rrotate();
     }
     if self.left.color() == Red && self.right.color() == Red {
@@ -348,30 +348,10 @@ impl<K: Ord, V> RbTree<K, V> {
     }
   }
 
-  /// Insert a key-value pair in the tree and return true,
-  /// or do nothing and return false if the key is already present.
-  pub fn insert(&mut self, key: K, val: V) -> Option<V> {
-    let ret = self.root.insert(key, val);
-    if ret.is_none() {
-      self.len += 1;
-    }
-    self.root.paint(Black);
-    ret
-  }
-
   pub fn iter<'a>(&'a self) -> RbTreeIterator<'a, K, V> {
     let mut iter = RbTreeIterator { stack: std::vec::with_capacity(m_depth(self.len)) };
     iter.push_left_tree(self.root.as_ref());
     iter
-  }
-
-  pub fn pop(&mut self, key: &K) -> Option<V> {
-    let ret = self.root.pop(key);
-    if ret.is_some() {
-      self.len -= 1;
-    }
-    self.root.paint(Black);
-    ret
   }
 
   fn is_sound(&self) -> bool {
@@ -407,6 +387,31 @@ impl<K: Ord+Eq, V: Eq> RbTree<K, V> {
 impl<K, V> Container for RbTree<K, V> {
   fn len(&self) -> uint {
     self.len
+  }
+}
+
+impl<K: Ord, V> MutableMap<K, V> for RbTree<K, V> {
+  fn swap(&mut self, k: K, v: V) -> Option<V> {
+    let ret = self.root.insert(k, v);
+    if ret.is_none() {
+      self.len += 1;
+    }
+    self.root.paint(Black);
+    ret
+  }
+
+
+  fn pop(&mut self, k: &K) -> Option<V> {
+    let ret = self.root.pop(k);
+    if ret.is_some() {
+      self.len -= 1;
+    }
+    self.root.paint(Black);
+    ret
+  }
+
+  fn find_mut<'a>(&'a mut self, k: &K) -> Option<&'a mut V> {
+    self.root.as_mut().and_then(|node| node.find_mut(k))
   }
 }
 
@@ -512,9 +517,9 @@ fn test_swap() {
   let mut rbt = RbTree::new();
   rbt.insert("key3", "C");
   rbt.insert("key1", "A");
-  rbt.insert("key2", "B").is_none() || fail!();
+  rbt.swap("key2", "B").is_none() || fail!();
   rbt.is_sound() || fail!();
-  rbt.insert("key1", "AA").unwrap() == "A" || fail!();
+  rbt.swap("key1", "AA").unwrap() == "A" || fail!();
   rbt.is_sound() || fail!();
   let ordered = ["AA", "B", "C"];
   for ((_, v), expected) in rbt.iter().zip(ordered.iter()) {
@@ -633,12 +638,13 @@ fn test_pop() {
   rbt.is_sound() || fail!();
   rbt.pop(&~"notakey").is_none() || fail!();
   rbt.is_sound() || fail!();
-  rbt.pop(&~"key9").unwrap() == ~"I" || fail!();
+  rbt.pop(&~"key5").unwrap() == ~"E" || fail!();
   rbt.is_sound() || fail!();
   rbt.pop(&~"key1").unwrap() == ~"A" || fail!();
   rbt.is_sound() || fail!();
-  rbt.pop(&~"key5").unwrap() == ~"E" || fail!();
+  rbt.pop(&~"key9").unwrap() == ~"I" || fail!();
   rbt.is_sound() || fail!();
+  rbt.is_empty() && fail!();
 }
 
 #[bench]
@@ -653,71 +659,19 @@ fn bench_insertion(b: &mut extra::test::BenchHarness) {
 }
 
 #[bench]
-fn bench_insertion_2(b: &mut extra::test::BenchHarness) {
+fn bench_insert_pop_many(b: &mut extra::test::BenchHarness) {
+  use std::rand;
+  use std::rand::Rng;
+  let mut rng = rand::rng();
   let mut rbt = RbTree::new();
-  rbt.insert("7",7);
+  for i in range(0, 50) {
+    rbt.insert(rng.gen_range(-100i, 100), i);
+  }
   b.iter(|| {
-    rbt.insert("1",1);
-  });
-}
-
-#[bench]
-fn bench_insertion_3(b: &mut extra::test::BenchHarness) {
-  let mut rbt = RbTree::new();
-  rbt.insert("7",7);
-  rbt.insert("1",1);
-  b.iter(|| {
-    rbt.insert("3",1);
-  });
-}
-
-#[bench]
-fn bench_insertion_4(b: &mut extra::test::BenchHarness) {
-  let mut rbt = RbTree::new();
-  rbt.insert("7",7);
-  rbt.insert("1",1);
-  rbt.insert("3",1);
-  b.iter(|| {
-    rbt.insert("2",1);
-  });
-}
-
-#[bench]
-fn bench_insertion_5(b: &mut extra::test::BenchHarness) {
-  let mut rbt = RbTree::new();
-  rbt.insert("7",7);
-  rbt.insert("1",1);
-  rbt.insert("3",1);
-  rbt.insert("2",1);
-  b.iter(|| {
-    rbt.insert("9",1);
-  });
-}
-
-#[bench]
-fn bench_insertion_6(b: &mut extra::test::BenchHarness) {
-  let mut rbt = RbTree::new();
-  rbt.insert("7",7);
-  rbt.insert("1",1);
-  rbt.insert("3",1);
-  rbt.insert("2",1);
-  rbt.insert("10",1);
-  b.iter(|| {
-    rbt.insert("8",1);
-  });
-}
-
-#[bench]
-fn bench_insertion_7(b: &mut extra::test::BenchHarness) {
-  let mut rbt = RbTree::new();
-  rbt.insert("7",7);
-  rbt.insert("1",1);
-  rbt.insert("3",1);
-  rbt.insert("2",1);
-  rbt.insert("10",1);
-  rbt.insert("8",1);
-  b.iter(|| {
-    rbt.insert("9",1);
+    let k = rng.gen_range(-100i,100);
+    let k2 = rng.gen_range(-100i,100);
+    rbt.insert(k, 1);
+    rbt.pop(&k2);
   });
 }
 
