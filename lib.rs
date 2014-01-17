@@ -648,30 +648,39 @@ fn test_pop() {
 }
 
 #[bench]
-fn bench_insertion(b: &mut extra::test::BenchHarness) {
-  use std::rand;
-  use std::rand::Rng;
-  let mut rng = rand::rng();
-  let mut rbt = RbTree::new();
+fn bench_insertion_empty(b: &mut extra::test::BenchHarness) {
   b.iter(|| {
-    rbt.insert(rng.gen::<int>(), 1);
+    let mut rbt = RbTree::new();
+    rbt.insert(1, 1);
   });
 }
 
 #[bench]
-fn bench_insert_pop_many(b: &mut extra::test::BenchHarness) {
+fn bench_insertion(b: &mut extra::test::BenchHarness) {
   use std::rand;
   use std::rand::Rng;
   let mut rng = rand::rng();
-  let mut rbt = RbTree::new();
-  for i in range(0, 50) {
-    rbt.insert(rng.gen_range(-100i, 100), i);
-  }
   b.iter(|| {
-    let k = rng.gen_range(-100i,100);
-    let k2 = rng.gen_range(-100i,100);
-    rbt.insert(k, 1);
-    rbt.pop(&k2);
+    let mut rbt = RbTree::new();
+    for i in range(0, 50) {
+      rbt.insert(rng.gen_range(-100i, 100), i);
+    }
+  });
+}
+
+#[bench]
+fn bench_insert_pop(b: &mut extra::test::BenchHarness) {
+  use std::rand;
+  use std::rand::Rng;
+  let mut rng = rand::rng();
+  b.iter(|| {
+    let mut rbt = RbTree::new();
+    for i in range(0, 50) {
+      rbt.insert(rng.gen_range(-100i, 100), i);
+    }
+    for _ in range(0, 50) {
+      rbt.pop(&rng.gen_range(-100i,100));
+    }
   });
 }
 
@@ -690,3 +699,114 @@ fn bench_find(b: &mut extra::test::BenchHarness) {
   });
 }
 
+#[bench]
+fn bench_insertion_empty_tm(b: &mut extra::test::BenchHarness) {
+  use extra::treemap::TreeMap;
+  b.iter(|| {
+    let mut rbt = TreeMap::new();
+    rbt.insert(1, 1);
+  });
+}
+
+#[bench]
+fn bench_insertion_tm(b: &mut extra::test::BenchHarness) {
+  use std::rand;
+  use std::rand::Rng;
+  use extra::treemap::TreeMap;
+  let mut rng = rand::rng();
+  b.iter(|| {
+    let mut rbt = TreeMap::new();
+    for i in range(0, 50) {
+      rbt.insert(rng.gen_range(-100i, 100), i);
+    }
+  });
+}
+
+#[bench]
+fn bench_insert_pop_tm(b: &mut extra::test::BenchHarness) {
+  use std::rand;
+  use std::rand::Rng;
+  use extra::treemap::TreeMap;
+  let mut rng = rand::rng();
+  b.iter(|| {
+    let mut rbt = TreeMap::new();
+    for i in range(0, 50) {
+      rbt.insert(rng.gen_range(-100i, 100), i);
+    }
+    for _ in range(0, 50) {
+      rbt.pop(&rng.gen_range(-100i,100));
+    }
+  });
+}
+
+#[bench]
+fn bench_find_tm(b: &mut extra::test::BenchHarness) {
+  use std::rand;
+  use std::rand::Rng;
+  use extra::treemap::TreeMap;
+  let mut rng = rand::rng();
+  let mut rbt = TreeMap::new();
+  for i in range(0, 100) {
+    rbt.insert(rng.gen_range(-100i, 100), i);
+  }
+
+  b.iter(|| {
+    rbt.find(&rng.gen_range(-100i, 100));
+  });
+}
+
+#[bench]
+fn bench_insertion_empty_hm(b: &mut extra::test::BenchHarness) {
+  use std::hashmap::HashMap;
+  b.iter(|| {
+    let mut rbt = HashMap::new();
+    rbt.insert(1, 1);
+  });
+}
+
+#[bench]
+fn bench_insertion_hm(b: &mut extra::test::BenchHarness) {
+  use std::rand;
+  use std::rand::Rng;
+  use std::hashmap::HashMap;
+  let mut rng = rand::rng();
+  b.iter(|| {
+    let mut rbt = HashMap::new();
+    for i in range(0, 50) {
+      rbt.insert(rng.gen_range(-100i, 100), i);
+    }
+  });
+}
+
+#[bench]
+fn bench_insert_pop_hm(b: &mut extra::test::BenchHarness) {
+  use std::rand;
+  use std::rand::Rng;
+  use std::hashmap::HashMap;
+  let mut rng = rand::rng();
+  b.iter(|| {
+    let mut rbt = HashMap::new();
+    for i in range(0, 50) {
+      rbt.insert(rng.gen_range(-100i, 100), i);
+    }
+    for _ in range(0, 50) {
+      rbt.pop(&rng.gen_range(-100i,100));
+    }
+  });
+}
+
+#[bench]
+fn bench_find_hm(b: &mut extra::test::BenchHarness) {
+  use std::rand;
+  use std::rand::Rng;
+  use std::hashmap::HashMap;
+  let mut rng = rand::rng();
+  let mut rbt = HashMap::new();
+  for i in range(0, 100) {
+    rbt.insert(rng.gen_range(-100i, 100), i);
+  }
+
+  b.iter(|| {
+    rbt.find(&rng.gen_range(-100i, 100));
+  });
+}
