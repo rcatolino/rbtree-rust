@@ -19,17 +19,9 @@ fn ptr_eq<T>(t1: &T, t2: &T) -> bool {
   std::ptr::to_unsafe_ptr(t1) == std::ptr::to_unsafe_ptr(t2)
 }
 
-#[deriving(Eq)]
-enum Color {
-  Red,
-  Black,
-}
-
-#[deriving(Eq)]
-enum Child {
-  Left,
-  Right,
-}
+type Color = u8;
+static Red: u8 = 0;
+static Black: u8 = 1;
 
 struct Node<K, V> {
   color: Color,
@@ -60,13 +52,10 @@ impl<K: Ord, V> Colored<K, V> for Option<~Node<K, V>> {
     self.as_mut().map_or(false, |n| {n.color = c; true})
   }
 
+  #[inline(always)]
   fn switch_color(&mut self) -> bool {
     self.as_mut().map_or(false, |n| {
-      if n.color == Red {
-        n.color = Black;
-      } else {
-        n.color = Red;
-      }
+      n.color ^= 1;
       true
     })
   }
@@ -225,49 +214,10 @@ impl<K: Ord, V> Node<K, V> {
   }
 
   #[inline]
-  fn color_flip_black(&mut self) {
-    // This is a 4-node, split it to make sure the search does not
-    // terminate on a 4-node.
-    self.color = Red;
-    self.left.paint(Black);
-    self.right.paint(Black);
-  }
-
-  #[inline]
   fn color_flip(&mut self) {
-    if self.color == Red {
-      self.color = Black;
-    } else {
-      self.color = Red;
-    }
+    self.color ^= 1;
     self.left.switch_color();
     self.right.switch_color();
-  }
-
-  fn find_mut<'a>(&'a mut self, key: &K) -> Option<&'a mut V> {
-    match if key < &self.key {
-      self.left.as_mut()
-    } else if key > &self.key {
-      self.right.as_mut()
-    } else {
-      return Some(&mut self.data);
-    } {
-      Some(node) => return node.find_mut(key),
-      None => None,
-    }
-  }
-
-  fn find<'a>(&'a self, key: &K) -> Option<&'a V> {
-    match if key < &self.key {
-      self.left.as_ref()
-    } else if key > &self.key {
-      self.right.as_ref()
-    } else {
-      return Some(&self.data);
-    } {
-      Some(node) => return node.find(key),
-      None => None,
-    }
   }
 
   #[inline(always)]
@@ -396,7 +346,7 @@ impl<K: Ord, V> MutableMap<K, V> for RbTree<K, V> {
     if ret.is_none() {
       self.len += 1;
     }
-    self.root.paint(Black);
+    self.root.as_mut().unwrap().color = Black;
     ret
   }
 
@@ -411,7 +361,9 @@ impl<K: Ord, V> MutableMap<K, V> for RbTree<K, V> {
   }
 
   fn find_mut<'a>(&'a mut self, k: &K) -> Option<&'a mut V> {
-    self.root.as_mut().and_then(|node| node.find_mut(k))
+    unsafe {
+      self.find(k).map(|result| std::cast::transmute_mut(result))
+    }
   }
 }
 
@@ -432,7 +384,21 @@ impl<K: Ord+Eq, V: Eq> Eq for RbTree<K, V> {
 impl<K: Ord, V> Map<K, V> for RbTree<K, V> {
   #[inline]
   fn find<'a>(&'a self, key: &K) -> Option<&'a V> {
-    self.root.as_ref().and_then(|node| node.find(key))
+    let mut next = &self.root;
+    loop {
+      match next {
+        &Some(ref node) => {
+          if *key < node.key {
+            next = &node.left;
+          } else if *key > node.key {
+            next = &node.right;
+          } else {
+            return Some(&node.data);
+          }
+        }
+        &None => return None,
+      }
+    }
   }
 }
 
@@ -618,6 +584,8 @@ fn test_find() {
   rbt.insert(~"key2", ~"B");
   rbt.find(&~"key1").unwrap() == &~"A" || fail!();
   rbt.find(&~"key4").is_none() || fail!();
+  rbt.find_mut(&~"key2").map(|ret| ret.push_str("D"));
+  rbt.find(&~"key2").unwrap() == &~"BD" || fail!();
   rbt.is_sound() || fail!();
 }
 
