@@ -1,8 +1,50 @@
+#[feature(macro_rules)];
 #[crate_id = "rbtree"];
 #[feature(asm)];
 
 extern mod extra;
 
+use timer::{Stats, Stopwatch};
+
+mod timer;
+
+macro_rules! mkstats (
+  ($fn1: ident $(,$fnname: ident)* ) => (
+    struct __stats__struct {
+      dyn_tim: Option<Stopwatch>,
+      $fn1: Stats,
+      $(
+        $fnname: Stats,
+       )*
+    }
+    static mut __stats: __stats__struct = __stats__struct {
+      dyn_tim: None,
+      $fn1: Stats {times_called: 0, min: -1 as u64, max: 0, cumul: 0},
+      $(
+        $fnname: Stats {times_called: 0, min: -1 as u64, max: 0, cumul: 0},
+       )*
+    };
+  )
+)
+
+macro_rules! time (
+  ($fnname: ident) => (let mut __sw__ = unsafe{Stopwatch::new(&mut __stats.$fnname)})
+)
+
+macro_rules! print_stats (
+  ($fn1: ident) => (
+    unsafe{
+      println!("  timer {} :", stringify!($fn1));
+      println!("    -Called {} times", __stats.$fn1.times_called);
+      println!("    -Min {} ns", __stats.$fn1.min);
+      println!("    -Max {} ns", __stats.$fn1.max);
+      println!("    -Avg {} ns", __stats.$fn1.avg());
+      println!("    -Total {} ns", __stats.$fn1.cumul);
+    }
+  )
+)
+
+mkstats!(color, color2, paint, switch, pop, pop1, pop2, pop3, pop4, pop5, pop6, pop7, lrotate, rrotate, moveRedRight, moveRedLeft, fix)
 #[inline]
 #[cfg(target_arch = "x86_64")] #[cfg(target_arch = "x86")]
 // yeah, yeah i know...
@@ -20,8 +62,8 @@ fn ptr_eq<T>(t1: &T, t2: &T) -> bool {
 }
 
 type Color = u8;
-static Red: u8 = 0;
-static Black: u8 = 1;
+static RED: u8 = 0;
+static BLACK: u8 = 1;
 
 struct Node<K, V> {
   color: Color,
@@ -33,27 +75,34 @@ struct Node<K, V> {
 
 trait Colored<K, V> {
   fn color(&self) -> Color;
-  fn paint(&mut self, Color) -> bool;
+  fn paint(&mut self, Color);
   fn switch_color(&mut self) -> bool;
   fn insert(&mut self, key: K, value: V) -> Option<V>;
   fn pop(&mut self, key: &K) -> Option<V>;
-  fn popMin(&mut self) -> ~Node<K, V>;
+  fn pop2(&mut self, key: &K) -> Option<V>;
+  fn pop_min(&mut self) -> ~Node<K, V>;
 }
 
 impl<K: Ord, V> Colored<K, V> for Option<~Node<K, V>> {
   #[inline(always)]
   fn color(&self) -> Color {
-    self.as_ref().map_or(Black, |n| n.color)
+    time!(color);
+    match self {
+      &None => BLACK,
+      &Some(ref n) => n.color,
+    }
   }
 
   // Returns true if the node could be painted.
   #[inline(always)]
-  fn paint(&mut self, c: Color) -> bool {
-    self.as_mut().map_or(false, |n| {n.color = c; true})
+  fn paint(&mut self, c: Color) {
+    time!(paint);
+    self.as_mut().unwrap().color = c;
   }
 
   #[inline(always)]
   fn switch_color(&mut self) -> bool {
+    time!(switch);
     self.as_mut().map_or(false, |n| {
       n.color ^= 1;
       true
@@ -74,6 +123,7 @@ impl<K: Ord, V> Colored<K, V> for Option<~Node<K, V>> {
     }
   }
 
+  /*
   // Fails if self is none.
   fn popMin(&mut self) -> ~Node<K, V> {
     if self.as_mut().unwrap().left.is_none() {
@@ -89,22 +139,85 @@ impl<K: Ord, V> Colored<K, V> for Option<~Node<K, V>> {
       ret
     }
   }
+  */
+
+  fn pop_min(&mut self) -> ~Node<K, V> {
+    let mut node = self.take_unwrap();
+    match match node.left {
+      None => return node,
+      Some(ref lnode) => (lnode.color, lnode.left.color()),
+    } {
+      (BLACK, BLACK) => node.moveRedLeft(), _ => ()
+    }
+    let ret = node.left.pop_min();
+    node.fix();
+    *self = Some(node);
+    ret
+  }
 
   fn pop(&mut self, key: &K) -> Option<V> {
+    match self.take() {
+      None => return None,
+      Some(mut node) => {
+        if *key < node.key {
+          if node.left.is_some() && node.left.color() == BLACK &&
+             node.left.as_ref().map_or(BLACK, |n| n.left.color()) == BLACK {
+            time!(pop1);
+            node.moveRedLeft();
+          }
+          let ret = node.left.pop(key);
+          time!(pop2);
+          node.fix();
+          *self = Some(node);
+          return ret;
+        }
+        if node.left.color() == RED {
+          time!(pop3);
+          node.rrotate();
+        }
+        if !(*key > node.key) && node.right.is_none() {
+          return Some(node.data);
+        }
+        if node.right.is_some() && node.right.color() == BLACK &&
+           node.right.as_ref().map_or(BLACK, |n| n.left.color()) == BLACK {
+          time!(pop4);
+          node.moveRedRight();
+        }
+        if *key > node.key {
+          let ret = node.right.pop(key);
+          time!(pop6);
+          node.fix();
+          *self = Some(node);
+          return ret;
+        }
+        time!(pop7);
+        let mut min = node.right.pop_min();
+        let ~Node {left: l, right: r, color: c, data: d, key: _} = node;
+        min.left = l;
+        min.right = r;
+        min.color = c;
+        min.fix();
+        *self = Some(min);
+        return Some(d);
+      }
+    }
+  }
+
+  fn pop2(&mut self, key: &K) -> Option<V> {
     match self {
       &None => return None,
       &Some(_) => {
         if *key < self.as_ref().unwrap().key {
           let node = self.as_mut().unwrap();
-          if node.left.color() == Black &&
-             node.left.as_ref().map_or(Black, |n| n.left.color()) == Black {
+          if node.left.color() == BLACK &&
+             node.left.as_ref().map_or(BLACK, |n| n.left.color()) == BLACK {
             node.moveRedLeft();
           }
           let ret = node.left.pop(key);
           node.fix();
           return ret;
         }
-        if self.as_ref().unwrap().left.color() == Red {
+        if self.as_ref().unwrap().left.color() == RED {
           self.as_mut().unwrap().rrotate();
         }
         if !(*key > self.as_ref().unwrap().key) &&
@@ -113,8 +226,8 @@ impl<K: Ord, V> Colored<K, V> for Option<~Node<K, V>> {
         }
         {
           let node  = self.as_mut().unwrap();
-          if node.right.is_some() && node.right.color() == Black &&
-             node.right.as_ref().map_or(Black, |n| n.left.color()) == Black {
+          if node.right.is_some() && node.right.color() == BLACK &&
+             node.right.as_ref().map_or(BLACK, |n| n.left.color()) == BLACK {
             node.moveRedRight();
           }
           if *key > node.key {
@@ -123,7 +236,7 @@ impl<K: Ord, V> Colored<K, V> for Option<~Node<K, V>> {
             return ret;
           }
         }
-        let mut min = self.as_mut().unwrap().right.popMin();
+        let mut min = self.as_mut().unwrap().right.pop_min();
         let ~Node {left: l, right: r, color: c, data: d, key: _} = self.take().unwrap();
         min.left = l;
         min.right = r;
@@ -136,7 +249,7 @@ impl<K: Ord, V> Colored<K, V> for Option<~Node<K, V>> {
   }
 }
 
-trait NodeRef {
+trait NodeRef<K, V> {
   fn moveRedLeft(&mut self);
   fn moveRedRight(&mut self);
   fn lrotate(&mut self)  -> bool;
@@ -144,10 +257,11 @@ trait NodeRef {
   fn fix(&mut self);
 }
 
-impl<K: Ord, V> NodeRef for ~Node<K, V> {
+impl<K: Ord, V> NodeRef<K, V> for ~Node<K, V> {
   fn moveRedLeft(&mut self) {
+    time!(moveRedLeft);
     self.color_flip();
-    if self.right.as_ref().map_or(false, |n| n.left.color() == Red) {
+    if self.right.as_ref().map_or(false, |n| n.left.color() == RED) {
       self.right.as_mut().unwrap().rrotate();
       self.lrotate();
       self.color_flip();
@@ -155,8 +269,9 @@ impl<K: Ord, V> NodeRef for ~Node<K, V> {
   }
 
   fn moveRedRight(&mut self) {
+    time!(moveRedLeft);
     self.color_flip();
-    if self.left.as_ref().map_or(false, |n| n.left.color() == Red) {
+    if self.left.as_ref().map_or(false, |n| n.left.color() == RED) {
       self.rrotate();
       self.color_flip();
     }
@@ -164,6 +279,7 @@ impl<K: Ord, V> NodeRef for ~Node<K, V> {
 
   #[inline(always)]
   fn lrotate(&mut self)  -> bool {
+    time!(lrotate);
     // Rotation of the root
     let mut y = match self.right.take() {
       None => return false, Some(_y) => _y
@@ -172,13 +288,14 @@ impl<K: Ord, V> NodeRef for ~Node<K, V> {
     std::util::swap(self, &mut y);
     std::util::swap(&mut y.right, &mut self.left);
     self.color = y.color;
-    y.color = Red;
+    y.color = RED;
     self.left = Some(y);
     true
   }
 
   #[inline(always)]
   fn rrotate(&mut self) -> bool {
+    time!(rrotate);
     let mut y = match self.left.take() {
       None => return false, Some(_y) => _y
     };
@@ -186,20 +303,21 @@ impl<K: Ord, V> NodeRef for ~Node<K, V> {
     std::util::swap(self, &mut y);
     std::util::swap(&mut y.left, &mut self.right);
     self.color = y.color;
-    y.color = Red;
+    y.color = RED;
     self.right = Some(y);
     true
   }
 
   fn fix(&mut self) {
-    if self.right.color() == Red {
+    time!(fix);
+    if self.right.color() == RED && self.left.color() == BLACK {
       self.lrotate();
     }
-    if self.left.color() == Red &&
-       self.left.as_ref().map_or(Black, |n| n.left.color()) == Red {
+    if self.left.color() == RED &&
+       self.left.as_ref().map_or(BLACK, |n| n.left.color()) == RED {
       self.rrotate();
     }
-    if self.left.color() == Red && self.right.color() == Red {
+    if self.left.color() == RED && self.right.color() == RED {
       self.color_flip();
     }
   }
@@ -209,7 +327,7 @@ impl<K: Ord, V> Node<K, V> {
   #[inline]
   fn new(key: K, val: V) -> Node<K, V> {
     Node {
-      color: Red, data: val, key: key, left: None, right: None,
+      color: RED, data: val, key: key, left: None, right: None,
     }
   }
 
@@ -233,9 +351,9 @@ impl<K: Ord, V> Node<K, V> {
   }
 
   fn print(&self) {
-    print!("{:?}({:?}) -> ", self.color, self.data);
-    self.left.as_ref().map(|n| print!("{:?}({:?}) , ", n.color, n.data));
-    self.right.as_ref().map(|n| print!(" , {:?}({:?})", n.color, n.data));
+    print!("{:?}({:?}) -> ", self.color, self.key);
+    self.left.as_ref().map(|n| print!("{:?}({:?}) , ", n.color, n.key));
+    self.right.as_ref().map(|n| print!(" , {:?}({:?})", n.color, n.key));
     print!("\n");
     self.left.as_ref().map(|n| n.print());
     self.right.as_ref().map(|n| n.print());
@@ -244,14 +362,20 @@ impl<K: Ord, V> Node<K, V> {
 
   fn is_sound(&self) -> Result<~[uint], ~str> {
     let mut result = self.left.as_ref().map_or(Ok(~[]), |left| {
-      if self.color == Red && left.color == Red {
-        Err(format!("2 Red nodes in a raw : {:?} -> {:?}", self.data, left.data))
+      if self.key <= left.key {
+        Err(format!("Left child superior to node: {:?},{:?} -> {:?},{:?}",
+                    self.key, self.data, left.key, left.data))
+      } else if self.color == RED && left.color == RED {
+        Err(format!("2 Red nodes in a raw : {:?} -> {:?}", self.key, left.key))
       } else {
         left.is_sound()
       }
     }).and_then(|mut lbh| {
       match self.right.as_ref().map_or(Ok(~[]), |right| {
-        if right.color == Red {
+        if self.key >= right.key {
+          Err(format!("Right child inferior to node: {:?},{:?} -> {:?},{:?}",
+                       self.key, self.data, right.key, right.data))
+        } else if right.color == RED {
           Err(format!("Right leaning red node : {:?} -> {:?}", self.data, right.data))
         } else {
           right.is_sound()
@@ -265,7 +389,7 @@ impl<K: Ord, V> Node<K, V> {
         // This is a leaf node.
         bh.push(0);
       }
-      if self.color == Black {
+      if self.color == BLACK {
         for height in bh.mut_iter() {
           *height += 1;
         }
@@ -346,17 +470,18 @@ impl<K: Ord, V> MutableMap<K, V> for RbTree<K, V> {
     if ret.is_none() {
       self.len += 1;
     }
-    self.root.as_mut().unwrap().color = Black;
+    self.root.as_mut().unwrap().color = BLACK;
     ret
   }
 
 
   fn pop(&mut self, k: &K) -> Option<V> {
+    time!(pop);
     let ret = self.root.pop(k);
     if ret.is_some() {
       self.len -= 1;
     }
-    self.root.paint(Black);
+    self.root.paint(BLACK);
     ret
   }
 
@@ -590,7 +715,7 @@ fn test_find() {
 }
 
 #[test]
-fn test_pop() {
+fn test_pop1() {
   let mut rbt = RbTree::new();
   rbt.insert(~"key7", ~"G");
   rbt.insert(~"key1", ~"A");
@@ -613,6 +738,56 @@ fn test_pop() {
   rbt.pop(&~"key9").unwrap() == ~"I" || fail!();
   rbt.is_sound() || fail!();
   rbt.is_empty() && fail!();
+}
+
+#[test]
+fn test_pop2() {
+  use std::rand;
+  use std::rand::Rng;
+  let mut rng = rand::rng();
+  let mut rbt = RbTree::new();
+  for i in range(0, 10) {
+    rbt.insert(rng.gen_range(-100i, 100), i);
+    rbt.is_sound() || fail!();
+  }
+  for _ in range(0, 50) {
+    rbt.pop(&rng.gen_range(-100i,100));
+    rbt.is_sound() || fail!();
+  }
+}
+
+#[test]
+fn test_pop_measured() {
+  let mut rbt = RbTree::new();
+  rbt.insert(~"key7", ~"G");
+  rbt.insert(~"key1", ~"A");
+  rbt.insert(~"key3", ~"C");
+  rbt.insert(~"key8", ~"H");
+  rbt.insert(~"key2", ~"B");
+  rbt.insert(~"key4", ~"D");
+  rbt.insert(~"key5", ~"E");
+  rbt.insert(~"key9", ~"I");
+  rbt.insert(~"key6", ~"F");
+  rbt.pop(&~"key3").unwrap() == ~"C" || fail!();
+  /*
+  print_stats!(lrotate);
+  print_stats!(rrotate);
+  print_stats!(fix);
+  print_stats!(moveRedLeft);
+  print_stats!(moveRedRight);
+  print_stats!(color);
+  print_stats!(color2);
+  print_stats!(paint);
+  print_stats!(switch);
+  print_stats!(pop);
+  print_stats!(pop1);
+  print_stats!(pop2);
+  print_stats!(pop3);
+  print_stats!(pop4);
+  print_stats!(pop5);
+  print_stats!(pop6);
+  print_stats!(pop7);
+  */
 }
 
 #[bench]
