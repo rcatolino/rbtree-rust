@@ -84,7 +84,6 @@ trait Colored<K, V> {
   fn switch_color(&mut self);
   fn insert(&mut self, key: K, value: V) -> Option<V>;
   fn pop(&mut self, key: &K) -> Option<V>;
-  fn pop2(&mut self, key: &K) -> Option<V>;
   fn pop_min(&mut self) -> ~Node<K, V>;
 }
 
@@ -162,8 +161,7 @@ impl<K: Ord, V> Colored<K, V> for Option<~Node<K, V>> {
           node.rrotate();
         } else if !(*key > node.key) && node.right.is_none() {
           return Some(node.data);
-        }
-        if match node.right {
+        } else if match node.right {
           Some(ref rn) => (rn.color, rn.left.color()),
           None => (BLACK, RED),
         } == (BLACK, BLACK) {
@@ -190,50 +188,6 @@ impl<K: Ord, V> Colored<K, V> for Option<~Node<K, V>> {
     }
   }
 
-  fn pop2(&mut self, key: &K) -> Option<V> {
-    match self {
-      &None => return None,
-      &Some(_) => {
-        if *key < self.as_ref().unwrap().key {
-          let node = self.as_mut().unwrap();
-          if node.left.color() == BLACK &&
-             node.left.as_ref().map_or(BLACK, |n| n.left.color()) == BLACK {
-            node.moveRedLeft();
-          }
-          let ret = node.left.pop(key);
-          node.fix();
-          return ret;
-        }
-        if self.as_ref().unwrap().left.color() == RED {
-          self.as_mut().unwrap().rrotate();
-        }
-        if !(*key > self.as_ref().unwrap().key) &&
-           self.as_ref().unwrap().right.is_none() {
-          return self.take().map(|n| n.data);
-        }
-        {
-          let node  = self.as_mut().unwrap();
-          if node.right.is_some() && node.right.color() == BLACK &&
-             node.right.as_ref().map_or(BLACK, |n| n.left.color()) == BLACK {
-            node.moveRedRight();
-          }
-          if *key > node.key {
-            let ret = node.right.pop(key);
-            node.fix();
-            return ret;
-          }
-        }
-        let mut min = self.as_mut().unwrap().right.pop_min();
-        let ~Node {left: l, right: r, color: c, data: d, key: _} = self.take().unwrap();
-        min.left = l;
-        min.right = r;
-        min.color = c;
-        *self = Some(min);
-        self.as_mut().unwrap().fix();
-        return Some(d);
-      }
-    }
-  }
 }
 
 trait NodeRef<K, V> {
