@@ -71,118 +71,105 @@ static RED: u8 = 0;
 static BLACK: u8 = 1;
 
 struct Node<K, V> {
-  color: Color,
   data: V,
   key: K,
-  left: Option<~Node<K, V>>,
-  right: Option<~Node<K, V>>,
+  left: ColoredNode<K, V>,
+  right: ColoredNode<K, V>,
 }
 
-trait Colored<K, V> {
-  fn color(&self) -> Color;
-  fn paint(&mut self, Color);
-  fn switch_color(&mut self);
-  fn insert(&mut self, key: K, value: V) -> Option<V>;
-  fn pop(&mut self, key: &K) -> Option<V>;
-  fn pop_min(&mut self) -> ~Node<K, V>;
+struct ColoredNode<K, V> {
+  color: Color,
+  node: Option<~Node<K, V>>
 }
 
-impl<K: Ord, V> Colored<K, V> for Option<~Node<K, V>> {
-  #[inline(always)]
-  fn color(&self) -> Color {
-    time!(color);
-    match self {
-      &None => BLACK,
-      &Some(ref n) => n.color,
-    }
+impl<K: Ord, V: Eq> Eq for ColoredNode<K, V> {
+  fn eq(&self, other: &ColoredNode<K, V>) -> bool {
+    self.node == other.node
   }
+}
 
-  #[inline(always)]
-  fn paint(&mut self, c: Color) {
-    time!(paint);
-    self.as_mut().unwrap().color = c;
-  }
-
+impl<K: Ord, V> ColoredNode<K, V> {
   #[inline(always)]
   fn switch_color(&mut self) {
     time!(switch);
-    self.as_mut().unwrap().color ^= 1;
+    self.color ^= 1;
   }
 
   fn insert(&mut self, key: K, val: V) -> Option<V> {
-    match self {
-      &None => {
-        *self = Some(~Node::new(key, val));
+    match self.node {
+      None => {
+        self.node = Some(~Node::new(key, val));
+        self.color = RED;
         None
       }
-      &Some(ref mut node) => {
-        let ret = node.insert(key, val);
-        node.fix();
+      Some(ref mut n) => {
+        let ret = n.insert(key, val);
+        n.fix(&mut self.color);
         ret
       }
     }
   }
 
   fn pop_min(&mut self) -> ~Node<K, V> {
-    let mut node = self.take_unwrap();
-    match match node.left {
-      None => return node,
-      Some(ref lnode) => (lnode.color, lnode.left.color()),
-    } {
-      (BLACK, BLACK) => node.moveRedLeft(), _ => ()
+    let mut node = self.node.take_unwrap();
+    if node.left.node.is_none() {
+      self.color = BLACK;
+      return node;
+    } else if node.left.color == BLACK && node.left.node.as_ref().unwrap().left.color == BLACK {
+      node.moveRedLeft(&mut self.color);
     }
     let ret = node.left.pop_min();
-    node.fix();
-    *self = Some(node);
+    node.fix(&mut self.color);
+    self.node = Some(node);
     ret
   }
 
   fn pop(&mut self, key: &K) -> Option<V> {
-    match self.take() {
+    match self.node.take() {
       None => return None,
       Some(mut node) => {
-        let (lc, llc) = match node.left {
-          Some(ref ln) => (ln.color, ln.left.color()),
-          None => (BLACK, RED),
-        };
+        let (lc, llc) = (node.left.color, match node.left.node {
+          Some(ref ln) => ln.left.color,
+          None => RED,
+        });
         if *key < node.key {
           if lc == BLACK && llc == BLACK {
             time!(pop1);
-            node.moveRedLeft();
+            node.moveRedLeft(&mut self.color);
           }
           let ret = node.left.pop(key);
           time!(pop2);
-          node.fix();
-          *self = Some(node);
+          node.fix(&mut self.color);
+          self.node = Some(node);
           return ret;
         }
         if lc == RED {
           time!(pop3);
           node.rrotate();
-        } else if !(*key > node.key) && node.right.is_none() {
+        } else if !(*key > node.key) && node.right.node.is_none() {
+          self.color = BLACK;
           return Some(node.data);
-        } else if match node.right {
-          Some(ref rn) => (rn.color, rn.left.color()),
-          None => (BLACK, RED),
-        } == (BLACK, BLACK) {
+        } else if node.right.color == BLACK && match node.right.node {
+          Some(ref rn) => rn.left.color == BLACK,
+          None => false,
+        } {
           time!(pop4);
-          node.moveRedRight();
+          node.moveRedRight(&mut self.color);
         }
         if *key > node.key {
           let ret = node.right.pop(key);
           time!(pop6);
-          node.fix();
-          *self = Some(node);
+          node.fix(&mut self.color);
+          self.node = Some(node);
           return ret;
         }
         time!(pop7);
         let mut min = node.right.pop_min();
-        let ~Node {left: l, right: r, color: c, data: d, key: _} = node;
+        let ~Node {left: l, right: r, data: d, key: _} = node;
         min.left = l;
         min.right = r;
-        min.color = c;
-        min.fix();
-        *self = Some(min);
+        min.fix(&mut self.color);
+        self.node = Some(min);
         return Some(d);
       }
     }
@@ -191,36 +178,36 @@ impl<K: Ord, V> Colored<K, V> for Option<~Node<K, V>> {
 }
 
 trait NodeRef<K, V> {
-  fn moveRedLeft(&mut self);
-  fn moveRedRight(&mut self);
+  fn moveRedLeft(&mut self, c: &mut Color);
+  fn moveRedRight(&mut self, c: &mut Color);
   fn lrotate(&mut self);
   fn rrotate(&mut self);
-  fn lrotate_flip(&mut self);
-  fn rrotate_flip(&mut self);
-  fn fix(&mut self);
+  fn lrotate_flip(&mut self, c: &mut Color);
+  fn rrotate_flip(&mut self, c: &mut Color);
+  fn fix(&mut self, c: &mut Color);
 }
 
 impl<K: Ord, V> NodeRef<K, V> for ~Node<K, V> {
-  fn moveRedLeft(&mut self) {
+  fn moveRedLeft(&mut self, c: &mut Color) {
     time!(moveRedLeft);
-    self.color_flip();
-    if match self.right {
-      Some(ref n) => n.left.color() == RED,
+    self.color_flip(c);
+    if match self.right.node {
+      Some(ref n) => n.left.color == RED,
       None => fail!(),
     } {
-      self.right.as_mut().unwrap().rrotate();
-      self.lrotate_flip();
+      self.right.node.as_mut().unwrap().rrotate();
+      self.lrotate_flip(c);
     }
   }
 
-  fn moveRedRight(&mut self) {
+  fn moveRedRight(&mut self, c: &mut Color) {
     time!(moveRedRight);
-    self.color_flip();
-    if match self.left {
-      Some(ref n) => n.left.color() == RED,
+    self.color_flip(c);
+    if match self.left.node {
+      Some(ref n) => n.left.color == RED,
       None => fail!()
     } {
-      self.rrotate_flip();
+      self.rrotate_flip(c);
     }
   }
 
@@ -228,63 +215,64 @@ impl<K: Ord, V> NodeRef<K, V> for ~Node<K, V> {
   fn lrotate(&mut self) {
     time!(lrotate);
     // Rotation of the root
-    let mut y = self.right.take_unwrap();
+    let mut y = self.right.node.take_unwrap();
     std::util::swap(self, &mut y);
-    std::util::swap(&mut y.right, &mut self.left);
-    self.color = y.color;
-    y.color = RED;
-    self.left = Some(y);
+    std::util::swap(&mut y.right.node, &mut self.left.node);
+    y.right.color = self.left.color;
+    self.left.color = RED;
+    self.left.node = Some(y);
   }
 
   #[inline(always)]
-  fn lrotate_flip(&mut self) {
+  fn lrotate_flip(&mut self, c: &mut Color) {
     time!(lrotate_flip);
     // Rotation of the root
-    let mut y = self.right.take_unwrap();
+    let mut y = self.right.node.take_unwrap();
     std::util::swap(self, &mut y);
-    std::util::swap(&mut y.right, &mut self.left);
-    self.color = 1^y.color;
-    y.color = BLACK;
-    self.left = Some(y);
+    std::util::swap(&mut y.right.node, &mut self.left.node);
+    y.right.color = self.left.color;
+    *c ^= 1;
+    self.left.color = BLACK;
+    self.left.node = Some(y);
     self.right.switch_color();
   }
 
   #[inline(always)]
   fn rrotate(&mut self) {
     time!(rrotate);
-    let mut y = self.left.take_unwrap();
+    let mut y = self.left.node.take_unwrap();
     std::util::swap(self, &mut y);
-    std::util::swap(&mut y.left, &mut self.right);
-    self.color = y.color;
-    y.color = RED;
-    self.right = Some(y);
+    std::util::swap(&mut y.left.node, &mut self.right.node);
+    y.left.color = self.right.color;
+    self.right.color = RED;
+    self.right.node = Some(y);
   }
 
   #[inline(always)]
-  fn rrotate_flip(&mut self) {
+  fn rrotate_flip(&mut self, c: &mut Color) {
     time!(rrotate_flip);
-    let mut y = self.left.take_unwrap();
+    let mut y = self.left.node.take_unwrap();
     std::util::swap(self, &mut y);
-    std::util::swap(&mut y.left, &mut self.right);
-    self.color = 1^y.color;
-    y.color = BLACK;
-    self.right = Some(y);
+    std::util::swap(&mut y.left.node, &mut self.right.node);
+    y.left.color = self.right.color;
+    *c ^= 1;
+    self.right.color = BLACK;
+    self.right.node = Some(y);
     self.left.switch_color();
   }
 
-  fn fix(&mut self) {
+  fn fix(&mut self, c: &mut Color) {
     time!(fix);
-    let lc = self.left.color();
-    let rc = self.right.color();
-    if lc == BLACK && rc == RED {
+    if self.left.color == BLACK && self.right.color == RED {
       self.lrotate();
-      if self.right.color() == RED {
-        self.color_flip();
+      if self.right.color == RED {
+        self.color_flip(c);
       }
-    } else if lc == RED && self.left.as_ref().unwrap().left.color() == RED {
-      self.rrotate_flip();
-    } else if lc == RED && rc == RED {
-      self.color_flip();
+    } else if self.left.color == RED &&
+              self.left.node.as_ref().unwrap().left.color == RED {
+      self.rrotate_flip(c);
+    } else if self.left.color == RED && self.right.color == RED {
+      self.color_flip(c);
     }
   }
 }
@@ -293,14 +281,15 @@ impl<K: Ord, V> Node<K, V> {
   #[inline]
   fn new(key: K, val: V) -> Node<K, V> {
     Node {
-      color: RED, data: val, key: key, left: None, right: None,
+      data: val, key: key, left: ColoredNode { color: BLACK, node: None},
+      right: ColoredNode { color: BLACK, node: None },
     }
   }
 
   #[inline]
-  fn color_flip(&mut self) {
+  fn color_flip(&mut self, c: &mut Color) {
     time!(cf);
-    self.color ^= 1;
+    *c ^= 1;
     self.left.switch_color();
     self.right.switch_color();
   }
@@ -317,35 +306,40 @@ impl<K: Ord, V> Node<K, V> {
     }
   }
 
-  fn print(&self) {
-    print!("{:?}({:?}) -> ", self.color, self.key);
-    self.left.as_ref().map(|n| print!("{:?}({:?}) , ", n.color, n.key));
-    self.right.as_ref().map(|n| print!(" , {:?}({:?})", n.color, n.key));
+  fn print(&self, c: Color) {
+    print!("{:?}({:?}) -> ", c, self.key);
+    self.left.node.as_ref().map(|n| print!("{:?}({:?}) , ", self.left.color, n.key));
+    self.right.node.as_ref().map(|n| print!(" , {:?}({:?})", self.right.color, n.key));
     print!("\n");
-    self.left.as_ref().map(|n| n.print());
-    self.right.as_ref().map(|n| n.print());
+    self.left.node.as_ref().map(|n| n.print(self.left.color));
+    self.right.node.as_ref().map(|n| n.print(self.right.color));
     print!("\n");
   }
 
-  fn is_sound(&self) -> Result<~[uint], ~str> {
-    let mut result = self.left.as_ref().map_or(Ok(~[]), |left| {
+  fn is_sound(&self, c: Color) -> Result<~[uint], ~str> {
+    if self.left.color == RED && self.left.node.is_none() {
+      return Err(format!("Red left leaf for {:?}", self.key));
+    } else if self.right.color == RED && self.right.node.is_none() {
+      return Err(format!("Red left leaf for {:?}", self.key));
+    }
+    let mut result = self.left.node.as_ref().map_or(Ok(~[]), |left| {
       if self.key <= left.key {
         Err(format!("Left child superior to node: {:?},{:?} -> {:?},{:?}",
                     self.key, self.data, left.key, left.data))
-      } else if self.color == RED && left.color == RED {
+      } else if c == RED && self.left.color == RED {
         Err(format!("2 Red nodes in a raw : {:?} -> {:?}", self.key, left.key))
       } else {
-        left.is_sound()
+        left.is_sound(self.left.color)
       }
     }).and_then(|mut lbh| {
-      match self.right.as_ref().map_or(Ok(~[]), |right| {
+      match self.right.node.as_ref().map_or(Ok(~[]), |right| {
         if self.key >= right.key {
           Err(format!("Right child inferior to node: {:?},{:?} -> {:?},{:?}",
                        self.key, self.data, right.key, right.data))
-        } else if right.color == RED {
+        } else if self.right.color == RED {
           Err(format!("Right leaning red node : {:?} -> {:?}", self.data, right.data))
         } else {
-          right.is_sound()
+          right.is_sound(self.right.color)
         }
       }) {
         Ok(rbh) => {lbh.push_all_move(rbh); Ok(lbh)}, Err(msg) => Err(msg),
@@ -356,7 +350,7 @@ impl<K: Ord, V> Node<K, V> {
         // This is a leaf node.
         bh.push(0);
       }
-      if self.color == BLACK {
+      if c == BLACK {
         for height in bh.mut_iter() {
           *height += 1;
         }
@@ -377,7 +371,7 @@ impl<K: Ord, V: Eq> Eq for Node<K, V> {
 }
 
 pub struct RbTree<K, V> {
-  root: Option<~Node<K, V>>,
+  root: ColoredNode<K, V>,
   len: uint,
 }
 
@@ -385,24 +379,28 @@ impl<K: Ord, V> RbTree<K, V> {
   /// Creates a new red-black tree.
   pub fn new() -> RbTree<K, V> {
     RbTree {
-      root: None, len: 0,
+      root: ColoredNode { color: BLACK, node: None }, len: 0,
     }
   }
 
   pub fn iter<'a>(&'a self) -> RbTreeIterator<'a, K, V> {
     let mut iter = RbTreeIterator { stack: std::vec::with_capacity(m_depth(self.len)) };
-    iter.push_left_tree(self.root.as_ref());
+    iter.push_left_tree(self.root.node.as_ref());
     iter
   }
 
+  fn print(&self) {
+    self.root.node.as_ref().unwrap().print(self.root.color);
+  }
+
   fn is_sound(&self) -> bool {
-    let sound = self.root.as_ref().map_or(Ok(~[]), |n| n.is_sound());
+    let sound = self.root.node.as_ref().map_or(Ok(~[]), |n| n.is_sound(self.root.color));
     match sound {
       Ok(black_heights) => {
         for i in black_heights.iter() {
           if *i != black_heights[0] {
             println!("Unequals black heights. {:?}", black_heights);
-            self.root.as_ref().unwrap().print();
+            self.root.node.as_ref().unwrap().print(self.root.color);
             return false;
           }
         }
@@ -421,7 +419,7 @@ impl<K: Ord+Eq, V: Eq> RbTree<K, V> {
   /// wich returns true if both tree contain the same values, even
   /// if they are aranged in a different ways in each tree.
   pub fn exact_eq(&self, other: &RbTree<K, V>) -> bool {
-    self.len == other.len && self.root == other.root
+    self.len == other.len && self.root.node == other.root.node
   }
 }
 
@@ -437,7 +435,7 @@ impl<K: Ord, V> MutableMap<K, V> for RbTree<K, V> {
     if ret.is_none() {
       self.len += 1;
     }
-    self.root.as_mut().unwrap().color = BLACK;
+    self.root.color = BLACK;
     ret
   }
 
@@ -448,7 +446,7 @@ impl<K: Ord, V> MutableMap<K, V> for RbTree<K, V> {
     if ret.is_some() {
       self.len -= 1;
     }
-    self.root.paint(BLACK);
+    self.root.color = BLACK;
     ret
   }
 
@@ -461,7 +459,7 @@ impl<K: Ord, V> MutableMap<K, V> for RbTree<K, V> {
 
 impl<K, V> Mutable for RbTree<K, V> {
   fn clear(&mut self) {
-    self.root.take();
+    self.root.node.take();
     self.len = 0;
   }
 }
@@ -476,14 +474,14 @@ impl<K: Ord+Eq, V: Eq> Eq for RbTree<K, V> {
 impl<K: Ord, V> Map<K, V> for RbTree<K, V> {
   #[inline]
   fn find<'a>(&'a self, key: &K) -> Option<&'a V> {
-    let mut next = &self.root;
+    let mut next = &self.root.node;
     loop {
       match next {
         &Some(ref node) => {
           if *key < node.key {
-            next = &node.left;
+            next = &node.left.node;
           } else if *key > node.key {
-            next = &node.right;
+            next = &node.right.node;
           } else {
             return Some(&node.data);
           }
@@ -502,14 +500,14 @@ impl<'tree, K: Ord, V> RbTreeIterator<'tree, K, V> {
   fn push_left_tree(&mut self, root: Option<&'tree ~Node<K, V>>) {
     root.while_some(|node_ref| {
       self.stack.push(&**node_ref);
-      node_ref.left.as_ref()
+      node_ref.left.node.as_ref()
     });
   }
 
   fn pop_left_tree(&mut self, n: &'tree Node<K, V>) {
     let mut lchild = n;
     self.stack.pop_opt().while_some(|last| {
-      if last.right.is_some() && ptr_eq(lchild, &**last.right.as_ref().unwrap()) {
+      if last.right.node.is_some() && ptr_eq(lchild, &**last.right.node.as_ref().unwrap()) {
         lchild = last;
         self.stack.pop_opt()
       } else {
@@ -523,9 +521,9 @@ impl<'tree, K: Ord, V> RbTreeIterator<'tree, K, V> {
 impl<'tree, K: Ord, V> Iterator<(&'tree K, &'tree V)> for RbTreeIterator<'tree, K, V> {
   fn next(&mut self) -> Option<(&'tree K, &'tree V)> {
     self.stack.pop_opt().map(|node| {
-      if node.right.is_some() {
+      if node.right.node.is_some() {
         self.stack.push(node);
-        self.push_left_tree(node.right.as_ref());
+        self.push_left_tree(node.right.node.as_ref());
       } else {
         self.pop_left_tree(node);
       }
@@ -534,6 +532,9 @@ impl<'tree, K: Ord, V> Iterator<(&'tree K, &'tree V)> for RbTreeIterator<'tree, 
   }
 }
 
+fn mkcn<K: Ord, V>(k: K, v: V) -> ColoredNode<K, V> {
+  ColoredNode { color: BLACK, node: Some(~Node::new(k, v)), }
+}
 #[test]
 fn test_insert() {
   let mut rbt = RbTree::new();
@@ -556,15 +557,18 @@ fn test_insert() {
     assert_eq!(v, expected);
   }
   let ref mut expected = RbTree::new();
-  expected.root = Some(~Node::new("key5", "E"));
-  expected.root.as_mut().unwrap().left = Some(~Node::new("key3", "C"));
-  expected.root.as_mut().unwrap().right = Some(~Node::new("key7", "G"));
-  expected.root.as_mut().unwrap().right.as_mut().unwrap().left = Some(~Node::new("key6", "F"));
+  expected.root = mkcn("key5", "E");
   {
-  let r = expected.root.as_mut().unwrap().left.as_mut().unwrap();
-  r.right = Some(~Node::new("key4", "D"));
-  r.left = Some(~Node::new("key2", "B"));
-  r.left.as_mut().unwrap().left = Some(~Node::new("key1", "A"));
+    let root = expected.root.node.as_mut().unwrap();
+    root.left = mkcn("key3", "C");
+    root.right = mkcn("key7", "G");
+    root.right.node.as_mut().unwrap().left = mkcn("key6", "F");
+    {
+      let r = root.left.node.as_mut().unwrap();
+      r.right = mkcn("key4", "D");
+      r.left = mkcn("key2", "B");
+      r.left.node.as_mut().unwrap().left = mkcn("key1", "A");
+    }
   }
   expected.len = 7;
   assert!(rbt.exact_eq(expected));
@@ -635,36 +639,36 @@ fn test_exact_equality() {
 #[test]
 fn test_root_lrotate() {
   let ref mut tree = RbTree::new();
-  tree.root = Some(~Node::new("X", "X"));
-  tree.root.as_mut().unwrap().left = Some(~Node::new("A", "A"));
-  tree.root.as_mut().unwrap().right = Some(~Node::new("Y", "Y"));
-  tree.root.as_mut().unwrap().right.as_mut().unwrap().left = Some(~Node::new("B", "B"));
-  tree.root.as_mut().unwrap().right.as_mut().unwrap().right = Some(~Node::new("C", "C"));
+  tree.root = mkcn("X", "X");
+  tree.root.node.as_mut().unwrap().left = mkcn("A", "A");
+  tree.root.node.as_mut().unwrap().right = mkcn("Y", "Y");
+  tree.root.node.as_mut().unwrap().right.node.as_mut().unwrap().left = mkcn("B", "B");
+  tree.root.node.as_mut().unwrap().right.node.as_mut().unwrap().right = mkcn("C", "C");
   let ref mut expected = RbTree::new();
-  expected.root = Some(~Node::new("Y", "Y"));
-  expected.root.as_mut().unwrap().left = Some(~Node::new("X", "X"));
-  expected.root.as_mut().unwrap().left.as_mut().unwrap().left = Some(~Node::new("A", "A"));
-  expected.root.as_mut().unwrap().left.as_mut().unwrap().right = Some(~Node::new("B", "B"));
-  expected.root.as_mut().unwrap().right = Some(~Node::new("C", "C"));
-  tree.root.as_mut().unwrap().lrotate();
+  expected.root = mkcn("Y", "Y");
+  expected.root.node.as_mut().unwrap().left = mkcn("X", "X");
+  expected.root.node.as_mut().unwrap().left.node.as_mut().unwrap().left = mkcn("A", "A");
+  expected.root.node.as_mut().unwrap().left.node.as_mut().unwrap().right = mkcn("B", "B");
+  expected.root.node.as_mut().unwrap().right = mkcn("C", "C");
+  tree.root.node.as_mut().unwrap().lrotate();
   assert!(tree.exact_eq(expected));
 }
 
 #[test]
 fn test_root_rrotate() {
   let ref mut tree = RbTree::new();
-  tree.root = Some(~Node::new("Y", "Y"));
-  tree.root.as_mut().unwrap().left = Some(~Node::new("X", "X"));
-  tree.root.as_mut().unwrap().left.as_mut().unwrap().left = Some(~Node::new("A", "A"));
-  tree.root.as_mut().unwrap().left.as_mut().unwrap().right = Some(~Node::new("B", "B"));
-  tree.root.as_mut().unwrap().right = Some(~Node::new("C", "C"));
+  tree.root = mkcn("Y", "Y");
+  tree.root.node.as_mut().unwrap().left = mkcn("X", "X");
+  tree.root.node.as_mut().unwrap().left.node.as_mut().unwrap().left = mkcn("A", "A");
+  tree.root.node.as_mut().unwrap().left.node.as_mut().unwrap().right = mkcn("B", "B");
+  tree.root.node.as_mut().unwrap().right = mkcn("C", "C");
   let ref mut expected = RbTree::new();
-  expected.root = Some(~Node::new("X", "X"));
-  expected.root.as_mut().unwrap().left = Some(~Node::new("A", "A"));
-  expected.root.as_mut().unwrap().right = Some(~Node::new("Y", "Y"));
-  expected.root.as_mut().unwrap().right.as_mut().unwrap().left = Some(~Node::new("B", "B"));
-  expected.root.as_mut().unwrap().right.as_mut().unwrap().right = Some(~Node::new("C", "C"));
-  tree.root.as_mut().unwrap().rrotate();
+  expected.root = mkcn("X", "X");
+  expected.root.node.as_mut().unwrap().left = mkcn("A", "A");
+  expected.root.node.as_mut().unwrap().right = mkcn("Y", "Y");
+  expected.root.node.as_mut().unwrap().right.node.as_mut().unwrap().left = mkcn("B", "B");
+  expected.root.node.as_mut().unwrap().right.node.as_mut().unwrap().right = mkcn("C", "C");
+  tree.root.node.as_mut().unwrap().rrotate();
   assert!(tree.exact_eq(expected));
 }
 
@@ -674,11 +678,11 @@ fn test_find() {
   rbt.insert(~"key3", ~"C");
   rbt.insert(~"key1", ~"A");
   rbt.insert(~"key2", ~"B");
+  rbt.is_sound() || fail!();
   rbt.find(&~"key1").unwrap() == &~"A" || fail!();
   rbt.find(&~"key4").is_none() || fail!();
   rbt.find_mut(&~"key2").map(|ret| ret.push_str("D"));
   rbt.find(&~"key2").unwrap() == &~"BD" || fail!();
-  rbt.is_sound() || fail!();
 }
 
 #[test]
@@ -713,11 +717,11 @@ fn test_pop2() {
   use std::rand::Rng;
   let mut rng = rand::rng();
   let mut rbt = RbTree::new();
-  for i in range(0, 10) {
+  for i in range(0, 60) {
     rbt.insert(rng.gen_range(-100i, 100), i);
     rbt.is_sound() || fail!();
   }
-  for _ in range(0, 50) {
+  for _ in range(0, 60) {
     rbt.pop(&rng.gen_range(-100i,100));
     rbt.is_sound() || fail!();
   }
@@ -736,6 +740,7 @@ fn test_pop_measured() {
   rbt.insert(~"key9", ~"I");
   rbt.insert(~"key6", ~"F");
   rbt.pop(&~"key3").unwrap() == ~"C" || fail!();
+  /*
   print_stats!(lrotate);
   print_stats!(rrotate);
   print_stats!(lrotate_flip);
@@ -754,6 +759,7 @@ fn test_pop_measured() {
   print_stats!(pop4);
   print_stats!(pop6);
   print_stats!(pop7);
+  */
 }
 
 #[bench]
