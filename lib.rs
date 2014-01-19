@@ -49,7 +49,7 @@ macro_rules! print_stats (
   )
 )
 
-mkstats!(cf, color, paint, switch, pop, pop1, pop2, pop3, pop4, pop6, pop7, lrotate, rrotate, lrotate_flip, rrotate_flip, moveRedRight, moveRedLeft, fix)
+mkstats!(cf, switch, pop, pop1, pop2, pop3, pop4, pop6, pop7, lrotate, rrotate, lrotate_flip, rrotate_flip, moveRedRight, moveRedLeft, fix)
 #[inline]
 #[cfg(target_arch = "x86_64")] #[cfg(target_arch = "x86")]
 // yeah, yeah i know...
@@ -95,7 +95,7 @@ impl<K: Ord, V> ColoredNode<K, V> {
     self.color ^= 1;
   }
 
-  fn insert(&mut self, key: K, val: V) -> Option<V> {
+  fn insert(&mut self, key: K, mut val: V) -> Option<V> {
     match self.node {
       None => {
         self.node = Some(~Node::new(key, val));
@@ -103,9 +103,31 @@ impl<K: Ord, V> ColoredNode<K, V> {
         None
       }
       Some(ref mut n) => {
-        let ret = n.insert(key, val);
-        n.fix(&mut self.color);
-        ret
+        if key < n.key {
+          let ret = n.left.insert(key, val);
+          let (lc, rc) = (n.left.color, n.right.color);
+          if lc == RED && n.left.node.as_ref().unwrap().left.color == RED {
+            n.rrotate_flip(&mut self.color);
+          } else if lc == RED && rc == RED {
+            n.color_flip(&mut self.color);
+          }
+          ret
+        } else if key > n.key {
+          let ret = n.right.insert(key, val);
+          let (lc, rc) = (n.left.color, n.right.color);
+          if lc == BLACK && rc == RED {
+            n.lrotate();
+            if n.right.color == RED {
+              n.color_flip(&mut self.color);
+            }
+          } else if lc == RED && rc == RED {
+            n.color_flip(&mut self.color);
+          }
+          ret
+        } else {
+          std::util::swap(&mut n.data, &mut val);
+          Some(val)
+        }
       }
     }
   }
@@ -128,12 +150,11 @@ impl<K: Ord, V> ColoredNode<K, V> {
     match self.node.take() {
       None => return None,
       Some(mut node) => {
-        let (lc, llc) = (node.left.color, match node.left.node {
-          Some(ref ln) => ln.left.color,
-          None => RED,
-        });
         if *key < node.key {
-          if lc == BLACK && llc == BLACK {
+          if node.left.color == BLACK && match node.left.node {
+            Some(ref ln) => ln.left.color == BLACK,
+            None => false,
+          } {
             time!(pop1);
             node.moveRedLeft(&mut self.color);
           }
@@ -143,7 +164,7 @@ impl<K: Ord, V> ColoredNode<K, V> {
           self.node = Some(node);
           return ret;
         }
-        if lc == RED {
+        if node.left.color == RED {
           time!(pop3);
           node.rrotate();
         } else if !(*key > node.key) && node.right.node.is_none() {
@@ -263,15 +284,15 @@ impl<K: Ord, V> NodeRef<K, V> for ~Node<K, V> {
 
   fn fix(&mut self, c: &mut Color) {
     time!(fix);
-    if self.left.color == BLACK && self.right.color == RED {
+    let (lc, rc) = (self.left.color, self.right.color);
+    if lc == BLACK && rc == RED {
       self.lrotate();
       if self.right.color == RED {
         self.color_flip(c);
       }
-    } else if self.left.color == RED &&
-              self.left.node.as_ref().unwrap().left.color == RED {
+    } else if lc == RED && self.left.node.as_ref().unwrap().left.color == RED {
       self.rrotate_flip(c);
-    } else if self.left.color == RED && self.right.color == RED {
+    } else if lc == RED && rc == RED {
       self.color_flip(c);
     }
   }
@@ -729,29 +750,31 @@ fn test_pop2() {
 
 #[test]
 fn test_pop_measured() {
+  use std::rand;
+  use std::rand::Rng;
+  let mut rng = rand::rng();
   let mut rbt = RbTree::new();
-  rbt.insert(~"key7", ~"G");
-  rbt.insert(~"key1", ~"A");
-  rbt.insert(~"key3", ~"C");
-  rbt.insert(~"key8", ~"H");
-  rbt.insert(~"key2", ~"B");
-  rbt.insert(~"key4", ~"D");
-  rbt.insert(~"key5", ~"E");
-  rbt.insert(~"key9", ~"I");
-  rbt.insert(~"key6", ~"F");
-  rbt.pop(&~"key3").unwrap() == ~"C" || fail!();
+  for i in range(0, 60) {
+    rbt.insert(rng.gen_range(-100i, 100), i);
+    rbt.is_sound() || fail!();
+  }
+  for _ in range(0, 60) {
+    rbt.pop(&rng.gen_range(-100i,100));
+    rbt.is_sound() || fail!();
+  }
   /*
   print_stats!(lrotate);
   print_stats!(rrotate);
   print_stats!(lrotate_flip);
   print_stats!(rrotate_flip);
+  */
   print_stats!(fix);
   print_stats!(moveRedLeft);
   print_stats!(moveRedRight);
-  print_stats!(color);
+  /*
   print_stats!(cf);
-  print_stats!(paint);
   print_stats!(switch);
+  */
   print_stats!(pop);
   print_stats!(pop1);
   print_stats!(pop2);
@@ -759,7 +782,6 @@ fn test_pop_measured() {
   print_stats!(pop4);
   print_stats!(pop6);
   print_stats!(pop7);
-  */
 }
 
 #[bench]
