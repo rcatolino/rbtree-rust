@@ -754,6 +754,7 @@ fn test_pop2() {
   }
 }
 
+  /*
 #[test]
 fn test_pop_measured() {
   use std::rand;
@@ -769,7 +770,6 @@ fn test_pop_measured() {
     rbt.pop(&rng.gen_range(-2*n, 2*n));
     rbt.is_sound() || fail!();
   }
-  /*
   print_stats!(lrotate);
   print_stats!(rrotate);
   print_stats!(lrotate_flip);
@@ -786,8 +786,8 @@ fn test_pop_measured() {
   print_stats!(pop4);
   print_stats!(pop6);
   print_stats!(pop7);
-  */
 }
+  */
 
 #[bench]
 fn bench_insertion_empty(b: &mut extra::test::BenchHarness) {
