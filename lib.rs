@@ -203,7 +203,8 @@ impl<K: Ord, V> ColoredNode<K, V> {
 
 }
 
-trait NodeRef<K, V> {
+#[doc(hidden)]
+priv trait NodeRef<K, V> {
   fn moveRedLeft(&mut self, c: &mut Color);
   fn moveRedRight(&mut self, c: &mut Color);
   fn lrotate(&mut self);
