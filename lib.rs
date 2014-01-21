@@ -397,7 +397,7 @@ impl<K: Ord, V> RbTree<K, V> {
     }
   }
 
-  pub fn iter<'a>(&'a self) -> Entries<'a, K, V> {
+  pub fn iter<'tree>(&'tree self) -> Entries<'tree, K, V> {
     let mut iter = Entries { stack: std::vec::with_capacity(m_depth(self.len)) };
     iter.push_left_tree(self.root.node.as_ref());
     iter
@@ -506,8 +506,8 @@ impl<K: Ord, V> Map<K, V> for RbTree<K, V> {
   }
 }
 
-pub struct Entries<'a, K, V> {
-  priv stack: ~[&'a Node<K, V>],
+pub struct Entries<'tree, K, V> {
+  priv stack: ~[&'tree Node<K, V>],
 }
 
 impl<'tree, K: Ord, V> Entries<'tree, K, V> {
@@ -734,7 +734,7 @@ fn test_pop2() {
   use std::rand::Rng;
   let mut rng = rand::rng();
   let mut rbt = RbTree::new();
-  let n = 60u;
+  let n = 60i;
   for i in range(0, n) {
     rbt.insert(rng.gen_range(-2*n, 2*n), i);
     rbt.is_sound() || fail!();
