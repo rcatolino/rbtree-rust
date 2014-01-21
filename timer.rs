@@ -22,12 +22,14 @@ impl Stats {
   }
 }
 
+#[allow(dead_code)]
 pub struct Stopwatch {
   priv result_ptr: &'static mut Stats,
   priv start: u64,
 }
 
 impl Stopwatch {
+  #[allow(dead_code)]
   pub fn new(stats: &'static mut Stats) -> Stopwatch {
     Stopwatch { result_ptr: stats, start: time::precise_time_ns() }
   }

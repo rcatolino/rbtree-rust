@@ -1,3 +1,4 @@
+#[allow(unused_imports)]; // This is for the timer code, only used when the macros are invoked.
 #[feature(macro_rules)];
 #[crate_id = "rbtree"];
 #[feature(asm)];
@@ -5,11 +6,11 @@
 extern mod extra;
 
 use timer::{Stats, Stopwatch};
-
 mod timer;
 
 macro_rules! mkstats (
   ($fn1: ident $(,$fnname: ident)* ) => (
+
     struct __stats__struct {
       dyn_tim: Option<Stopwatch>,
       $fn1: Stats,
@@ -27,15 +28,6 @@ macro_rules! mkstats (
   )
 )
 
-/*
-macro_rules! time (
-  ($fnname: ident) => (let mut __sw__ = unsafe{Stopwatch::new(&mut __stats.$fnname)})
-)
-*/
-macro_rules! time (
-  ($fnname: ident) => (())
-)
-
 macro_rules! print_stats (
   ($fn1: ident) => (
     unsafe{
@@ -49,7 +41,19 @@ macro_rules! print_stats (
   )
 )
 
-mkstats!(cf, switch, pop, pop1, pop2, pop3, pop4, pop6, pop7, lrotate, rrotate, lrotate_flip, rrotate_flip, moveRedRight, moveRedLeft, fix)
+/*
+macro_rules! time (
+  ($fnname: ident) => (let mut __sw__ = unsafe{Stopwatch::new(&mut __stats.$fnname)})
+)
+
+mkstats!(cf, switch, pop, pop1, pop2, pop3, pop4, pop6, pop7, lrotate, rrotate,
+         lrotate_flip, rrotate_flip, moveRedRight, moveRedLeft, fix)
+*/
+macro_rules! time (
+  ($fnname: ident) => (())
+)
+
+
 #[inline]
 #[cfg(target_arch = "x86_64")] #[cfg(target_arch = "x86")]
 // yeah, yeah i know...
@@ -393,8 +397,8 @@ impl<K: Ord, V> RbTree<K, V> {
     }
   }
 
-  pub fn iter<'a>(&'a self) -> RbTreeIterator<'a, K, V> {
-    let mut iter = RbTreeIterator { stack: std::vec::with_capacity(m_depth(self.len)) };
+  pub fn iter<'a>(&'a self) -> Entries<'a, K, V> {
+    let mut iter = Entries { stack: std::vec::with_capacity(m_depth(self.len)) };
     iter.push_left_tree(self.root.node.as_ref());
     iter
   }
@@ -502,11 +506,11 @@ impl<K: Ord, V> Map<K, V> for RbTree<K, V> {
   }
 }
 
-pub struct RbTreeIterator<'a, K, V> {
+pub struct Entries<'a, K, V> {
   priv stack: ~[&'a Node<K, V>],
 }
 
-impl<'tree, K: Ord, V> RbTreeIterator<'tree, K, V> {
+impl<'tree, K: Ord, V> Entries<'tree, K, V> {
   fn push_left_tree(&mut self, root: Option<&'tree ~Node<K, V>>) {
     root.while_some(|node_ref| {
       self.stack.push(&**node_ref);
@@ -528,7 +532,7 @@ impl<'tree, K: Ord, V> RbTreeIterator<'tree, K, V> {
   }
 }
 
-impl<'tree, K: Ord, V> Iterator<(&'tree K, &'tree V)> for RbTreeIterator<'tree, K, V> {
+impl<'tree, K: Ord, V> Iterator<(&'tree K, &'tree V)> for Entries<'tree, K, V> {
   fn next(&mut self) -> Option<(&'tree K, &'tree V)> {
     self.stack.pop_opt().map(|node| {
       if node.right.node.is_some() {
