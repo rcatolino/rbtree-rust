@@ -390,13 +390,15 @@ pub struct RbTree<K, V> {
 }
 
 impl<K: Ord, V> RbTree<K, V> {
-  /// Creates a new red-black tree.
+  /// Creates a new tree.
   pub fn new() -> RbTree<K, V> {
     RbTree {
       root: ColoredNode { color: BLACK, node: None }, len: 0,
     }
   }
 
+  /// Returns an iterator over the tree nodes.
+  /// The nodes are iterated in their key's order.
   pub fn iter<'tree>(&'tree self) -> Entries<'tree, K, V> {
     let mut iter = Entries { stack: std::vec::with_capacity(m_depth(self.len)) };
     iter.push_left_tree(self.root.node.as_ref());
@@ -432,20 +434,23 @@ impl<K: Ord, V> RbTree<K, V> {
 }
 
 impl<K: Ord+Eq, V: Eq> RbTree<K, V> {
-  /// Returns true if both trees contain the same values, and
-  /// the trees have the same layout.
+  /// Returns true if both trees contain the same values and
+  /// have the same layout.
   pub fn exact_eq(&self, other: &RbTree<K, V>) -> bool {
     self.len == other.len && self.root.node == other.root.node
   }
 }
 
 impl<K, V> Container for RbTree<K, V> {
+  /// Returns the number of elements stored in the tree.
   fn len(&self) -> uint {
     self.len
   }
 }
 
 impl<K: Ord, V> MutableMap<K, V> for RbTree<K, V> {
+  /// Insert a key-value pair from the map. If the key already had a value
+  /// present in the map, that value is returned. Otherwise None is returned.
   fn swap(&mut self, k: K, v: V) -> Option<V> {
     let ret = self.root.insert(k, v);
     if ret.is_none() {
@@ -455,7 +460,8 @@ impl<K: Ord, V> MutableMap<K, V> for RbTree<K, V> {
     ret
   }
 
-
+  /// Removes a key from the map, returning the value at the key if the key
+  /// was previously in the map.
   fn pop(&mut self, k: &K) -> Option<V> {
     let ret = self.root.pop(k);
     if ret.is_some() {
@@ -465,6 +471,7 @@ impl<K: Ord, V> MutableMap<K, V> for RbTree<K, V> {
     ret
   }
 
+  /// Return a mutable reference to the value corresponding to the key
   fn find_mut<'a>(&'a mut self, k: &K) -> Option<&'a mut V> {
     unsafe {
       self.find(k).map(|result| std::cast::transmute_mut(result))
@@ -473,6 +480,7 @@ impl<K: Ord, V> MutableMap<K, V> for RbTree<K, V> {
 }
 
 impl<K, V> Mutable for RbTree<K, V> {
+  /// Clear the container, removing all values.
   fn clear(&mut self) {
     self.root.node.take();
     self.len = 0;
@@ -487,6 +495,7 @@ impl<K: Ord+Eq, V: Eq> Eq for RbTree<K, V> {
 }
 
 impl<K: Ord, V> Map<K, V> for RbTree<K, V> {
+  /// Return a reference to the value corresponding to the key
   fn find<'a>(&'a self, key: &K) -> Option<&'a V> {
     let mut next = &self.root.node;
     loop {
