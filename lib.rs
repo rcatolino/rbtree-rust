@@ -57,7 +57,7 @@ fn m_depth(n: uint) -> uint {
   unsafe {
     let mut ret: uint;
     asm!("bsr $1, $0" : "=r"(ret) : "r"(n) :: "volatile");
-    return ret+1;
+    return 2*ret+1;
   }
 }
 
@@ -147,6 +147,7 @@ impl<K: Ord, V> ColoredNode<K, V> {
   }
 
   fn pop(&mut self, key: &K) -> Option<V> {
+    time!(pop);
     match self.node.take() {
       None => return None,
       Some(mut node) => {
@@ -315,18 +316,6 @@ impl<K: Ord, V> Node<K, V> {
     self.right.switch_color();
   }
 
-  #[inline(always)]
-  fn insert(&mut self, key: K, mut val: V) -> Option<V> {
-    if key < self.key {
-      self.left.insert(key, val)
-    } else if key > self.key {
-      self.right.insert(key, val)
-    } else {
-      std::util::swap(&mut self.data, &mut val);
-      Some(val)
-    }
-  }
-
   fn print(&self, c: Color) {
     print!("{:?}({:?}) -> ", c, self.key);
     self.left.node.as_ref().map(|n| print!("{:?}({:?}) , ", self.left.color, n.key));
@@ -392,8 +381,8 @@ impl<K: Ord, V: Eq> Eq for Node<K, V> {
 }
 
 pub struct RbTree<K, V> {
-  root: ColoredNode<K, V>,
-  len: uint,
+  priv root: ColoredNode<K, V>,
+  priv len: uint,
 }
 
 impl<K: Ord, V> RbTree<K, V> {
@@ -410,10 +399,13 @@ impl<K: Ord, V> RbTree<K, V> {
     iter
   }
 
+  // Print and is_sound are only usefull for testing/debugging purposes.
+  #[allow(dead_code)]
   fn print(&self) {
     self.root.node.as_ref().unwrap().print(self.root.color);
   }
 
+  #[allow(dead_code)]
   fn is_sound(&self) -> bool {
     let sound = self.root.node.as_ref().map_or(Ok(~[]), |n| n.is_sound(self.root.color));
     match sound {
@@ -436,9 +428,8 @@ impl<K: Ord, V> RbTree<K, V> {
 }
 
 impl<K: Ord+Eq, V: Eq> RbTree<K, V> {
-  /// Returns true only if both tree are identical, unlike eq()
-  /// wich returns true if both tree contain the same values, even
-  /// if they are aranged in a different ways in each tree.
+  /// Returns true if both trees contain the same values, and
+  /// the trees have the same layout.
   pub fn exact_eq(&self, other: &RbTree<K, V>) -> bool {
     self.len == other.len && self.root.node == other.root.node
   }
@@ -462,7 +453,6 @@ impl<K: Ord, V> MutableMap<K, V> for RbTree<K, V> {
 
 
   fn pop(&mut self, k: &K) -> Option<V> {
-    time!(pop);
     let ret = self.root.pop(k);
     if ret.is_some() {
       self.len -= 1;
@@ -486,14 +476,13 @@ impl<K, V> Mutable for RbTree<K, V> {
 }
 
 impl<K: Ord+Eq, V: Eq> Eq for RbTree<K, V> {
-  /// Returns true if both tree contain the same values.
+  /// Returns true if both trees contain the same values.
   fn eq(&self, other: &RbTree<K, V>) -> bool {
     self.len == other.len && self.iter().to_owned_vec() == other.iter().to_owned_vec()
   }
 }
 
 impl<K: Ord, V> Map<K, V> for RbTree<K, V> {
-  #[inline]
   fn find<'a>(&'a self, key: &K) -> Option<&'a V> {
     let mut next = &self.root.node;
     loop {
@@ -514,7 +503,7 @@ impl<K: Ord, V> Map<K, V> for RbTree<K, V> {
 }
 
 pub struct RbTreeIterator<'a, K, V> {
-  stack: ~[&'a Node<K, V>],
+  priv stack: ~[&'a Node<K, V>],
 }
 
 impl<'tree, K: Ord, V> RbTreeIterator<'tree, K, V> {
@@ -553,9 +542,12 @@ impl<'tree, K: Ord, V> Iterator<(&'tree K, &'tree V)> for RbTreeIterator<'tree, 
   }
 }
 
+// Used in the tests.
+#[allow(dead_code)]
 fn mkcn<K: Ord, V>(k: K, v: V) -> ColoredNode<K, V> {
   ColoredNode { color: BLACK, node: Some(~Node::new(k, v)), }
 }
+
 #[test]
 fn test_insert() {
   let mut rbt = RbTree::new();
@@ -738,12 +730,13 @@ fn test_pop2() {
   use std::rand::Rng;
   let mut rng = rand::rng();
   let mut rbt = RbTree::new();
-  for i in range(0, 60) {
-    rbt.insert(rng.gen_range(-100i, 100), i);
+  let n = 60u;
+  for i in range(0, n) {
+    rbt.insert(rng.gen_range(-2*n, 2*n), i);
     rbt.is_sound() || fail!();
   }
-  for _ in range(0, 60) {
-    rbt.pop(&rng.gen_range(-100i,100));
+  for _ in range(0, n) {
+    rbt.pop(&rng.gen_range(-2*n, 2*n));
     rbt.is_sound() || fail!();
   }
 }
@@ -754,12 +747,13 @@ fn test_pop_measured() {
   use std::rand::Rng;
   let mut rng = rand::rng();
   let mut rbt = RbTree::new();
-  for i in range(0, 60) {
-    rbt.insert(rng.gen_range(-100i, 100), i);
+  let n = 60i;
+  for i in range(0, n) {
+    rbt.insert(rng.gen_range(-2*n, 2*n), i);
     rbt.is_sound() || fail!();
   }
-  for _ in range(0, 60) {
-    rbt.pop(&rng.gen_range(-100i,100));
+  for _ in range(0, n) {
+    rbt.pop(&rng.gen_range(-2*n, 2*n));
     rbt.is_sound() || fail!();
   }
   /*
@@ -767,14 +761,11 @@ fn test_pop_measured() {
   print_stats!(rrotate);
   print_stats!(lrotate_flip);
   print_stats!(rrotate_flip);
-  */
   print_stats!(fix);
   print_stats!(moveRedLeft);
   print_stats!(moveRedRight);
-  /*
   print_stats!(cf);
   print_stats!(switch);
-  */
   print_stats!(pop);
   print_stats!(pop1);
   print_stats!(pop2);
@@ -782,6 +773,7 @@ fn test_pop_measured() {
   print_stats!(pop4);
   print_stats!(pop6);
   print_stats!(pop7);
+  */
 }
 
 #[bench]

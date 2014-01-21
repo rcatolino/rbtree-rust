@@ -11,6 +11,8 @@ pub struct Stats {
 }
 
 impl Stats {
+  // Only used when a print_stats! macro is invoked.
+  #[allow(dead_code)]
   pub fn avg(&self) -> u64 {
     if self.times_called != 0 {
       self.cumul/self.times_called
