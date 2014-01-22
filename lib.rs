@@ -530,10 +530,10 @@ impl<'tree, K: Ord, V> Entries<'tree, K, V> {
 
   fn pop_left_tree(&mut self, n: &'tree Node<K, V>) {
     let mut lchild = n;
-    self.stack.pop_opt().while_some(|last| {
+    self.stack.pop().while_some(|last| {
       if last.right.node.is_some() && ptr_eq(lchild, &**last.right.node.as_ref().unwrap()) {
         lchild = last;
-        self.stack.pop_opt()
+        self.stack.pop()
       } else {
         self.stack.push(last);
         None
@@ -544,7 +544,7 @@ impl<'tree, K: Ord, V> Entries<'tree, K, V> {
 
 impl<'tree, K: Ord, V> Iterator<(&'tree K, &'tree V)> for Entries<'tree, K, V> {
   fn next(&mut self) -> Option<(&'tree K, &'tree V)> {
-    self.stack.pop_opt().map(|node| {
+    self.stack.pop().map(|node| {
       if node.right.node.is_some() {
         self.stack.push(node);
         self.push_left_tree(node.right.node.as_ref());
