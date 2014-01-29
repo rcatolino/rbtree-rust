@@ -1,6 +1,7 @@
 #[allow(unused_imports)]; // This is for the timer code, only used when the macros are invoked.
 #[feature(macro_rules)];
 #[crate_id = "rbtree"];
+#[crate_type = "lib"];
 #[feature(asm)];
 
 extern mod extra;
