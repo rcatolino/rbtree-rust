@@ -4,6 +4,7 @@
 #[crate_type = "lib"];
 #[feature(asm)];
 
+extern mod collections;
 extern mod extra;
 
 use timer::{Stats, Stopwatch};
@@ -361,7 +362,7 @@ impl<K: Ord, V> Node<K, V> {
         Ok(rbh) => {lbh.push_all_move(rbh); Ok(lbh)}, Err(msg) => Err(msg),
       }
     });
-    result.as_mut().map(|bh| {
+    let _ = result.as_mut().map(|bh| {
       if bh.is_empty() {
         // This is a leaf node.
         bh.push(0);
@@ -371,7 +372,6 @@ impl<K: Ord, V> Node<K, V> {
           *height += 1;
         }
       }
-      bh
     });
     return result;
   }
@@ -845,7 +845,7 @@ fn bench_find(b: &mut extra::test::BenchHarness) {
 
 #[bench]
 fn bench_insertion_empty_tm(b: &mut extra::test::BenchHarness) {
-  use extra::treemap::TreeMap;
+  use collections::treemap::TreeMap;
   b.iter(|| {
     let mut rbt = TreeMap::new();
     rbt.insert(1, 1);
@@ -856,7 +856,7 @@ fn bench_insertion_empty_tm(b: &mut extra::test::BenchHarness) {
 fn bench_insertion_tm(b: &mut extra::test::BenchHarness) {
   use std::rand;
   use std::rand::Rng;
-  use extra::treemap::TreeMap;
+  use collections::treemap::TreeMap;
   let mut rng = rand::rng();
   b.iter(|| {
     let mut rbt = TreeMap::new();
@@ -870,7 +870,7 @@ fn bench_insertion_tm(b: &mut extra::test::BenchHarness) {
 fn bench_insert_pop_tm(b: &mut extra::test::BenchHarness) {
   use std::rand;
   use std::rand::Rng;
-  use extra::treemap::TreeMap;
+  use collections::treemap::TreeMap;
   let mut rng = rand::rng();
   b.iter(|| {
     let mut rbt = TreeMap::new();
@@ -887,7 +887,7 @@ fn bench_insert_pop_tm(b: &mut extra::test::BenchHarness) {
 fn bench_find_tm(b: &mut extra::test::BenchHarness) {
   use std::rand;
   use std::rand::Rng;
-  use extra::treemap::TreeMap;
+  use collections::treemap::TreeMap;
   let mut rng = rand::rng();
   let mut rbt = TreeMap::new();
   for i in range(0, 100) {
