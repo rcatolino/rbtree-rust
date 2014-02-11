@@ -131,7 +131,7 @@ impl<K: Ord, V> ColoredNode<K, V> {
           }
           ret
         } else {
-          std::util::swap(&mut n.data, &mut val);
+          std::mem::swap(&mut n.data, &mut val);
           Some(val)
         }
       }
@@ -245,8 +245,8 @@ impl<K: Ord, V> NodeRef<K, V> for ~Node<K, V> {
     time!(lrotate);
     // Rotation of the root
     let mut y = self.right.node.take_unwrap();
-    std::util::swap(self, &mut y);
-    std::util::swap(&mut y.right.node, &mut self.left.node);
+    std::mem::swap(self, &mut y);
+    std::mem::swap(&mut y.right.node, &mut self.left.node);
     y.right.color = self.left.color;
     self.left.color = RED;
     self.left.node = Some(y);
@@ -257,8 +257,8 @@ impl<K: Ord, V> NodeRef<K, V> for ~Node<K, V> {
     time!(lrotate_flip);
     // Rotation of the root
     let mut y = self.right.node.take_unwrap();
-    std::util::swap(self, &mut y);
-    std::util::swap(&mut y.right.node, &mut self.left.node);
+    std::mem::swap(self, &mut y);
+    std::mem::swap(&mut y.right.node, &mut self.left.node);
     y.right.color = self.left.color;
     *c ^= 1;
     self.left.color = BLACK;
@@ -270,8 +270,8 @@ impl<K: Ord, V> NodeRef<K, V> for ~Node<K, V> {
   fn rrotate(&mut self) {
     time!(rrotate);
     let mut y = self.left.node.take_unwrap();
-    std::util::swap(self, &mut y);
-    std::util::swap(&mut y.left.node, &mut self.right.node);
+    std::mem::swap(self, &mut y);
+    std::mem::swap(&mut y.left.node, &mut self.right.node);
     y.left.color = self.right.color;
     self.right.color = RED;
     self.right.node = Some(y);
@@ -281,8 +281,8 @@ impl<K: Ord, V> NodeRef<K, V> for ~Node<K, V> {
   fn rrotate_flip(&mut self, c: &mut Color) {
     time!(rrotate_flip);
     let mut y = self.left.node.take_unwrap();
-    std::util::swap(self, &mut y);
-    std::util::swap(&mut y.left.node, &mut self.right.node);
+    std::mem::swap(self, &mut y);
+    std::mem::swap(&mut y.left.node, &mut self.right.node);
     y.left.color = self.right.color;
     *c ^= 1;
     self.right.color = BLACK;
