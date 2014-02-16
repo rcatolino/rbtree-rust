@@ -4,8 +4,8 @@
 #[crate_type = "lib"];
 #[feature(asm)];
 
-extern mod collections;
-extern mod extra;
+extern crate collections;
+extern crate extra;
 
 use timer::{Stats, Stopwatch};
 mod timer;
@@ -69,7 +69,7 @@ fn m_depth(n: uint) -> uint {
 
 #[inline]
 fn ptr_eq<T>(t1: &T, t2: &T) -> bool {
-  std::ptr::to_unsafe_ptr(t1) == std::ptr::to_unsafe_ptr(t2)
+  t1 as *T == t2 as *T
 }
 
 type Color = u8;
