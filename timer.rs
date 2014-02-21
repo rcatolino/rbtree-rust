@@ -1,4 +1,3 @@
-extern crate extra;
 
 use extra::time;
 use std::cmp::{min, max};

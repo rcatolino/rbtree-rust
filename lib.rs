@@ -4,8 +4,11 @@
 #[crate_type = "lib"];
 #[feature(asm)];
 
-extern crate collections;
 extern crate extra;
+extern crate collections;
+extern crate test;
+
+use test::BenchHarness;
 
 use timer::{Stats, Stopwatch};
 mod timer;
@@ -792,7 +795,7 @@ fn test_pop_measured() {
   */
 
 #[bench]
-fn bench_insertion_empty(b: &mut extra::test::BenchHarness) {
+fn bench_insertion_empty(b: &mut BenchHarness) {
   b.iter(|| {
     let mut rbt = RbTree::new();
     rbt.insert(1, 1);
@@ -800,7 +803,7 @@ fn bench_insertion_empty(b: &mut extra::test::BenchHarness) {
 }
 
 #[bench]
-fn bench_insertion(b: &mut extra::test::BenchHarness) {
+fn bench_insertion(b: &mut BenchHarness) {
   use std::rand;
   use std::rand::Rng;
   let mut rng = rand::rng();
@@ -813,7 +816,7 @@ fn bench_insertion(b: &mut extra::test::BenchHarness) {
 }
 
 #[bench]
-fn bench_insert_pop(b: &mut extra::test::BenchHarness) {
+fn bench_insert_pop(b: &mut BenchHarness) {
   use std::rand;
   use std::rand::Rng;
   let mut rng = rand::rng();
@@ -829,7 +832,7 @@ fn bench_insert_pop(b: &mut extra::test::BenchHarness) {
 }
 
 #[bench]
-fn bench_find(b: &mut extra::test::BenchHarness) {
+fn bench_find(b: &mut BenchHarness) {
   use std::rand;
   use std::rand::Rng;
   let mut rng = rand::rng();
@@ -844,7 +847,7 @@ fn bench_find(b: &mut extra::test::BenchHarness) {
 }
 
 #[bench]
-fn bench_insertion_empty_tm(b: &mut extra::test::BenchHarness) {
+fn bench_insertion_empty_tm(b: &mut BenchHarness) {
   use collections::treemap::TreeMap;
   b.iter(|| {
     let mut rbt = TreeMap::new();
@@ -853,7 +856,7 @@ fn bench_insertion_empty_tm(b: &mut extra::test::BenchHarness) {
 }
 
 #[bench]
-fn bench_insertion_tm(b: &mut extra::test::BenchHarness) {
+fn bench_insertion_tm(b: &mut BenchHarness) {
   use std::rand;
   use std::rand::Rng;
   use collections::treemap::TreeMap;
@@ -867,7 +870,7 @@ fn bench_insertion_tm(b: &mut extra::test::BenchHarness) {
 }
 
 #[bench]
-fn bench_insert_pop_tm(b: &mut extra::test::BenchHarness) {
+fn bench_insert_pop_tm(b: &mut BenchHarness) {
   use std::rand;
   use std::rand::Rng;
   use collections::treemap::TreeMap;
@@ -884,7 +887,7 @@ fn bench_insert_pop_tm(b: &mut extra::test::BenchHarness) {
 }
 
 #[bench]
-fn bench_find_tm(b: &mut extra::test::BenchHarness) {
+fn bench_find_tm(b: &mut BenchHarness) {
   use std::rand;
   use std::rand::Rng;
   use collections::treemap::TreeMap;
@@ -900,7 +903,7 @@ fn bench_find_tm(b: &mut extra::test::BenchHarness) {
 }
 
 #[bench]
-fn bench_insertion_empty_hm(b: &mut extra::test::BenchHarness) {
+fn bench_insertion_empty_hm(b: &mut BenchHarness) {
   use std::hashmap::HashMap;
   b.iter(|| {
     let mut rbt = HashMap::new();
@@ -909,7 +912,7 @@ fn bench_insertion_empty_hm(b: &mut extra::test::BenchHarness) {
 }
 
 #[bench]
-fn bench_insertion_hm(b: &mut extra::test::BenchHarness) {
+fn bench_insertion_hm(b: &mut BenchHarness) {
   use std::rand;
   use std::rand::Rng;
   use std::hashmap::HashMap;
@@ -923,7 +926,7 @@ fn bench_insertion_hm(b: &mut extra::test::BenchHarness) {
 }
 
 #[bench]
-fn bench_insert_pop_hm(b: &mut extra::test::BenchHarness) {
+fn bench_insert_pop_hm(b: &mut BenchHarness) {
   use std::rand;
   use std::rand::Rng;
   use std::hashmap::HashMap;
@@ -940,7 +943,7 @@ fn bench_insert_pop_hm(b: &mut extra::test::BenchHarness) {
 }
 
 #[bench]
-fn bench_find_hm(b: &mut extra::test::BenchHarness) {
+fn bench_find_hm(b: &mut BenchHarness) {
   use std::rand;
   use std::rand::Rng;
   use std::hashmap::HashMap;
