@@ -4,7 +4,7 @@
 #[crate_type = "lib"];
 #[feature(asm)];
 
-extern crate extra;
+extern crate time;
 extern crate collections;
 extern crate test;
 

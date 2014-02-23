@@ -1,5 +1,5 @@
 
-use extra::time;
+use time;
 use std::cmp::{min, max};
 
 pub struct Stats {
