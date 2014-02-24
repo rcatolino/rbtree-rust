@@ -904,7 +904,7 @@ fn bench_find_tm(b: &mut BenchHarness) {
 
 #[bench]
 fn bench_insertion_empty_hm(b: &mut BenchHarness) {
-  use std::hashmap::HashMap;
+  use collections::hashmap::HashMap;
   b.iter(|| {
     let mut rbt = HashMap::new();
     rbt.insert(1, 1);
@@ -915,7 +915,7 @@ fn bench_insertion_empty_hm(b: &mut BenchHarness) {
 fn bench_insertion_hm(b: &mut BenchHarness) {
   use std::rand;
   use std::rand::Rng;
-  use std::hashmap::HashMap;
+  use collections::hashmap::HashMap;
   let mut rng = rand::rng();
   b.iter(|| {
     let mut rbt = HashMap::new();
@@ -929,7 +929,7 @@ fn bench_insertion_hm(b: &mut BenchHarness) {
 fn bench_insert_pop_hm(b: &mut BenchHarness) {
   use std::rand;
   use std::rand::Rng;
-  use std::hashmap::HashMap;
+  use collections::hashmap::HashMap;
   let mut rng = rand::rng();
   b.iter(|| {
     let mut rbt = HashMap::new();
@@ -946,7 +946,7 @@ fn bench_insert_pop_hm(b: &mut BenchHarness) {
 fn bench_find_hm(b: &mut BenchHarness) {
   use std::rand;
   use std::rand::Rng;
-  use std::hashmap::HashMap;
+  use collections::hashmap::HashMap;
   let mut rng = rand::rng();
   let mut rbt = HashMap::new();
   for i in range(0, 100) {
