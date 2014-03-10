@@ -79,6 +79,7 @@ type Color = u8;
 static RED: u8 = 0;
 static BLACK: u8 = 1;
 
+#[deriving(Show)]
 struct Node<K, V> {
   data: V,
   key: K,
@@ -86,6 +87,7 @@ struct Node<K, V> {
   right: ColoredNode<K, V>,
 }
 
+#[deriving(Show)]
 struct ColoredNode<K, V> {
   color: Color,
   node: Option<~Node<K, V>>
@@ -389,6 +391,7 @@ impl<K: Ord, V: Eq> Eq for Node<K, V> {
   }
 }
 
+#[deriving(Show)]
 pub struct RbTree<K, V> {
   priv root: ColoredNode<K, V>,
   priv len: uint,
