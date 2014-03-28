@@ -11,6 +11,8 @@ extern crate rand;
 
 use rand::{StdRng, Rng};
 
+use std::vec::Vec;
+
 use test::BenchHarness;
 
 use timer::{Stats, Stopwatch};
@@ -411,7 +413,7 @@ impl<K: Ord, V> RbTree<K, V> {
   /// Returns an iterator over the tree nodes.
   /// The nodes are iterated in their key's order.
   pub fn iter<'tree>(&'tree self) -> Entries<'tree, K, V> {
-    let mut iter = Entries { stack: std::vec::with_capacity(m_depth(self.len)) };
+    let mut iter = Entries { stack: Vec::with_capacity(m_depth(self.len)) };
     iter.push_left_tree(self.root.node.as_ref());
     iter
   }
@@ -501,7 +503,15 @@ impl<K, V> Mutable for RbTree<K, V> {
 impl<K: Ord+Eq, V: Eq> Eq for RbTree<K, V> {
   /// Returns true if both trees contain the same values.
   fn eq(&self, other: &RbTree<K, V>) -> bool {
-    self.len == other.len && self.iter().to_owned_vec() == other.iter().to_owned_vec()
+    self.len == other.len && {
+      // In order traversal of both trees should yield the elements ordered.
+      for (snode, onode) in self.iter().zip(other.iter()) {
+        if snode != onode {
+          return false;
+        }
+      }
+      true
+    }
   }
 }
 
@@ -527,7 +537,7 @@ impl<K: Ord, V> Map<K, V> for RbTree<K, V> {
 }
 
 pub struct Entries<'tree, K, V> {
-  priv stack: ~[&'tree Node<K, V>],
+  priv stack: Vec<&'tree Node<K, V>>,
 }
 
 impl<'tree, K: Ord, V> Entries<'tree, K, V> {
