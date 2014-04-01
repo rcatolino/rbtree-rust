@@ -23,8 +23,8 @@ impl Stats {
 
 #[allow(dead_code)]
 pub struct Stopwatch {
-  priv result_ptr: &'static mut Stats,
-  priv start: u64,
+  result_ptr: &'static mut Stats,
+  start: u64,
 }
 
 impl Stopwatch {

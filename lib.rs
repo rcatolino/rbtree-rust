@@ -1,8 +1,8 @@
-#[allow(unused_imports)]; // This is for the timer code, only used when the macros are invoked.
-#[feature(macro_rules)];
-#[crate_id = "rbtree"];
-#[crate_type = "lib"];
-#[feature(asm)];
+#![allow(unused_imports)] // This is for the timer code, only used when the macros are invoked.
+#![feature(macro_rules)]
+#![crate_id = "rbtree"]
+#![crate_type = "lib"]
+#![feature(asm)]
 
 extern crate time;
 extern crate collections;
@@ -398,8 +398,8 @@ impl<K: Ord, V: Eq> Eq for Node<K, V> {
 
 #[deriving(Show)]
 pub struct RbTree<K, V> {
-  priv root: ColoredNode<K, V>,
-  priv len: uint,
+  root: ColoredNode<K, V>,
+  len: uint,
 }
 
 impl<K: Ord, V> RbTree<K, V> {
@@ -537,7 +537,7 @@ impl<K: Ord, V> Map<K, V> for RbTree<K, V> {
 }
 
 pub struct Entries<'tree, K, V> {
-  priv stack: Vec<&'tree Node<K, V>>,
+  stack: Vec<&'tree Node<K, V>>,
 }
 
 impl<'tree, K: Ord, V> Entries<'tree, K, V> {
