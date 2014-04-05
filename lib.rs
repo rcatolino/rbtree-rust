@@ -9,7 +9,7 @@ extern crate collections;
 extern crate test;
 extern crate rand;
 
-use rand::{StdRng, Rng};
+use rand::{task_rng, Rng};
 
 use std::vec::Vec;
 
@@ -760,7 +760,7 @@ fn test_pop1() {
 
 #[test]
 fn test_pop2() {
-  let mut rng = StdRng::new();
+  let mut rng = task_rng();
   let mut rbt = RbTree::new();
   let n = 60i;
   for i in range(0, n) {
@@ -776,7 +776,7 @@ fn test_pop2() {
   /*
 #[test]
 fn test_pop_measured() {
-  let mut rng = StdRng::new();
+  let mut rng = task_rng();
   let mut rbt = RbTree::new();
   let n = 60i;
   for i in range(0, n) {
@@ -816,7 +816,7 @@ fn bench_insertion_empty(b: &mut BenchHarness) {
 
 #[bench]
 fn bench_insertion(b: &mut BenchHarness) {
-  let mut rng = StdRng::new();
+  let mut rng = task_rng();
   b.iter(|| {
     let mut rbt = RbTree::new();
     for i in range(0, 50) {
@@ -827,7 +827,7 @@ fn bench_insertion(b: &mut BenchHarness) {
 
 #[bench]
 fn bench_insert_pop(b: &mut BenchHarness) {
-  let mut rng = StdRng::new();
+  let mut rng = task_rng();
   b.iter(|| {
     let mut rbt = RbTree::new();
     for i in range(0, 50) {
@@ -841,7 +841,7 @@ fn bench_insert_pop(b: &mut BenchHarness) {
 
 #[bench]
 fn bench_find(b: &mut BenchHarness) {
-  let mut rng = StdRng::new();
+  let mut rng = task_rng();
   let mut rbt = RbTree::new();
   for i in range(0, 100) {
     rbt.insert(rng.gen_range(-100i, 100), i);
@@ -864,7 +864,7 @@ fn bench_insertion_empty_tm(b: &mut BenchHarness) {
 #[bench]
 fn bench_insertion_tm(b: &mut BenchHarness) {
   use collections::treemap::TreeMap;
-  let mut rng = StdRng::new();
+  let mut rng = task_rng();
   b.iter(|| {
     let mut rbt = TreeMap::new();
     for i in range(0, 50) {
@@ -876,7 +876,7 @@ fn bench_insertion_tm(b: &mut BenchHarness) {
 #[bench]
 fn bench_insert_pop_tm(b: &mut BenchHarness) {
   use collections::treemap::TreeMap;
-  let mut rng = StdRng::new();
+  let mut rng = task_rng();
   b.iter(|| {
     let mut rbt = TreeMap::new();
     for i in range(0, 50) {
@@ -891,7 +891,7 @@ fn bench_insert_pop_tm(b: &mut BenchHarness) {
 #[bench]
 fn bench_find_tm(b: &mut BenchHarness) {
   use collections::treemap::TreeMap;
-  let mut rng = StdRng::new();
+  let mut rng = task_rng();
   let mut rbt = TreeMap::new();
   for i in range(0, 100) {
     rbt.insert(rng.gen_range(-100i, 100), i);
@@ -914,7 +914,7 @@ fn bench_insertion_empty_hm(b: &mut BenchHarness) {
 #[bench]
 fn bench_insertion_hm(b: &mut BenchHarness) {
   use collections::hashmap::HashMap;
-  let mut rng = StdRng::new();
+  let mut rng = task_rng();
   b.iter(|| {
     let mut rbt = HashMap::new();
     for i in range(0, 50) {
@@ -926,7 +926,7 @@ fn bench_insertion_hm(b: &mut BenchHarness) {
 #[bench]
 fn bench_insert_pop_hm(b: &mut BenchHarness) {
   use collections::hashmap::HashMap;
-  let mut rng = StdRng::new();
+  let mut rng = task_rng();
   b.iter(|| {
     let mut rbt = HashMap::new();
     for i in range(0, 50) {
@@ -941,7 +941,7 @@ fn bench_insert_pop_hm(b: &mut BenchHarness) {
 #[bench]
 fn bench_find_hm(b: &mut BenchHarness) {
   use collections::hashmap::HashMap;
-  let mut rng = StdRng::new();
+  let mut rng = task_rng();
   let mut rbt = HashMap::new();
   for i in range(0, 100) {
     rbt.insert(rng.gen_range(-100i, 100), i);
