@@ -13,7 +13,7 @@ use rand::{task_rng, Rng};
 
 use std::vec::Vec;
 
-use test::BenchHarness;
+use test::Bencher;
 
 use timer::{Stats, Stopwatch};
 mod timer;
@@ -721,15 +721,16 @@ fn test_root_rrotate() {
 
 #[test]
 fn test_find() {
+  use std::strbuf::StrBuf;
   let mut rbt = RbTree::new();
-  rbt.insert(~"key3", ~"C");
-  rbt.insert(~"key1", ~"A");
-  rbt.insert(~"key2", ~"B");
+  rbt.insert(~"key3", StrBuf::from_str("C"));
+  rbt.insert(~"key1", StrBuf::from_str("A"));
+  rbt.insert(~"key2", StrBuf::from_str("B"));
   rbt.is_sound() || fail!();
-  rbt.find(&~"key1").unwrap() == &~"A" || fail!();
+  rbt.find(&~"key1").unwrap().as_slice() == "A" || fail!();
   rbt.find(&~"key4").is_none() || fail!();
-  rbt.find_mut(&~"key2").map(|ret| ret.push_str("D"));
-  rbt.find(&~"key2").unwrap() == &~"BD" || fail!();
+  rbt.find_mut(&~"key2").map(|ret| ret.push_char('D'));
+  rbt.find(&~"key2").unwrap().as_slice() == "BD" || fail!();
 }
 
 #[test]
@@ -807,7 +808,7 @@ fn test_pop_measured() {
   */
 
 #[bench]
-fn bench_insertion_empty(b: &mut BenchHarness) {
+fn bench_insertion_empty(b: &mut Bencher) {
   b.iter(|| {
     let mut rbt = RbTree::new();
     rbt.insert(1, 1);
@@ -815,7 +816,7 @@ fn bench_insertion_empty(b: &mut BenchHarness) {
 }
 
 #[bench]
-fn bench_insertion(b: &mut BenchHarness) {
+fn bench_insertion(b: &mut Bencher) {
   let mut rng = task_rng();
   b.iter(|| {
     let mut rbt = RbTree::new();
@@ -826,7 +827,7 @@ fn bench_insertion(b: &mut BenchHarness) {
 }
 
 #[bench]
-fn bench_insert_pop(b: &mut BenchHarness) {
+fn bench_insert_pop(b: &mut Bencher) {
   let mut rng = task_rng();
   b.iter(|| {
     let mut rbt = RbTree::new();
@@ -840,7 +841,7 @@ fn bench_insert_pop(b: &mut BenchHarness) {
 }
 
 #[bench]
-fn bench_find(b: &mut BenchHarness) {
+fn bench_find(b: &mut Bencher) {
   let mut rng = task_rng();
   let mut rbt = RbTree::new();
   for i in range(0, 100) {
@@ -853,7 +854,7 @@ fn bench_find(b: &mut BenchHarness) {
 }
 
 #[bench]
-fn bench_insertion_empty_tm(b: &mut BenchHarness) {
+fn bench_insertion_empty_tm(b: &mut Bencher) {
   use collections::treemap::TreeMap;
   b.iter(|| {
     let mut rbt = TreeMap::new();
@@ -862,7 +863,7 @@ fn bench_insertion_empty_tm(b: &mut BenchHarness) {
 }
 
 #[bench]
-fn bench_insertion_tm(b: &mut BenchHarness) {
+fn bench_insertion_tm(b: &mut Bencher) {
   use collections::treemap::TreeMap;
   let mut rng = task_rng();
   b.iter(|| {
@@ -874,7 +875,7 @@ fn bench_insertion_tm(b: &mut BenchHarness) {
 }
 
 #[bench]
-fn bench_insert_pop_tm(b: &mut BenchHarness) {
+fn bench_insert_pop_tm(b: &mut Bencher) {
   use collections::treemap::TreeMap;
   let mut rng = task_rng();
   b.iter(|| {
@@ -889,7 +890,7 @@ fn bench_insert_pop_tm(b: &mut BenchHarness) {
 }
 
 #[bench]
-fn bench_find_tm(b: &mut BenchHarness) {
+fn bench_find_tm(b: &mut Bencher) {
   use collections::treemap::TreeMap;
   let mut rng = task_rng();
   let mut rbt = TreeMap::new();
@@ -903,7 +904,7 @@ fn bench_find_tm(b: &mut BenchHarness) {
 }
 
 #[bench]
-fn bench_insertion_empty_hm(b: &mut BenchHarness) {
+fn bench_insertion_empty_hm(b: &mut Bencher) {
   use collections::hashmap::HashMap;
   b.iter(|| {
     let mut rbt = HashMap::new();
@@ -912,7 +913,7 @@ fn bench_insertion_empty_hm(b: &mut BenchHarness) {
 }
 
 #[bench]
-fn bench_insertion_hm(b: &mut BenchHarness) {
+fn bench_insertion_hm(b: &mut Bencher) {
   use collections::hashmap::HashMap;
   let mut rng = task_rng();
   b.iter(|| {
@@ -924,7 +925,7 @@ fn bench_insertion_hm(b: &mut BenchHarness) {
 }
 
 #[bench]
-fn bench_insert_pop_hm(b: &mut BenchHarness) {
+fn bench_insert_pop_hm(b: &mut Bencher) {
   use collections::hashmap::HashMap;
   let mut rng = task_rng();
   b.iter(|| {
@@ -939,7 +940,7 @@ fn bench_insert_pop_hm(b: &mut BenchHarness) {
 }
 
 #[bench]
-fn bench_find_hm(b: &mut BenchHarness) {
+fn bench_find_hm(b: &mut Bencher) {
   use collections::hashmap::HashMap;
   let mut rng = task_rng();
   let mut rbt = HashMap::new();
