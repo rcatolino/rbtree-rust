@@ -216,7 +216,7 @@ impl<K: Ord, V> ColoredNode<K, V> {
 }
 
 #[doc(hidden)]
-priv trait NodeRef<K, V> {
+trait NodeRef<K, V> {
   fn moveRedLeft(&mut self, c: &mut Color);
   fn moveRedRight(&mut self, c: &mut Color);
   fn lrotate(&mut self);
@@ -343,13 +343,13 @@ impl<K: Ord, V> Node<K, V> {
     print!("\n");
   }
 
-  fn is_sound(&self, c: Color) -> Result<~[uint], ~str> {
+  fn is_sound(&self, c: Color) -> Result<Vec<uint>, ~str> {
     if self.left.color == RED && self.left.node.is_none() {
       return Err(format!("Red left leaf for {:?}", self.key));
     } else if self.right.color == RED && self.right.node.is_none() {
       return Err(format!("Red left leaf for {:?}", self.key));
     }
-    let mut result = self.left.node.as_ref().map_or(Ok(~[]), |left| {
+    let mut result = self.left.node.as_ref().map_or(Ok(Vec::new()), |left| {
       if self.key <= left.key {
         Err(format!("Left child superior to node: {:?},{:?} -> {:?},{:?}",
                     self.key, self.data, left.key, left.data))
@@ -359,7 +359,7 @@ impl<K: Ord, V> Node<K, V> {
         left.is_sound(self.left.color)
       }
     }).and_then(|mut lbh| {
-      match self.right.node.as_ref().map_or(Ok(~[]), |right| {
+      match self.right.node.as_ref().map_or(Ok(Vec::new()), |right| {
         if self.key >= right.key {
           Err(format!("Right child inferior to node: {:?},{:?} -> {:?},{:?}",
                        self.key, self.data, right.key, right.data))
@@ -426,11 +426,12 @@ impl<K: Ord, V> RbTree<K, V> {
 
   #[allow(dead_code)]
   fn is_sound(&self) -> bool {
-    let sound = self.root.node.as_ref().map_or(Ok(~[]), |n| n.is_sound(self.root.color));
+    let sound = self.root.node.as_ref().map_or(Ok(Vec::new()),
+                                               |n| n.is_sound(self.root.color));
     match sound {
       Ok(black_heights) => {
         for i in black_heights.iter() {
-          if *i != black_heights[0] {
+          if i != black_heights.get(0) {
             println!("Unequals black heights. {:?}", black_heights);
             self.root.node.as_ref().unwrap().print(self.root.color);
             return false;
