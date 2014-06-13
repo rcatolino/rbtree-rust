@@ -1,22 +1,22 @@
 #![allow(unused_imports)] // This is for the timer code, only used when the macros are invoked.
-#![feature(macro_rules)]
 #![crate_id = "rbtree"]
 #![crate_type = "lib"]
-#![feature(asm)]
+#![feature(asm, macro_rules)]
 
+extern crate debug;
 extern crate time;
 extern crate collections;
 extern crate test;
-extern crate rand;
 
-use rand::{task_rng, Rng};
-
+use std::rand::{task_rng, Rng};
 use std::vec::Vec;
 
 use test::Bencher;
 
 use timer::{Stats, Stopwatch};
 mod timer;
+
+type BNode<K,V> = Box<Node<K,V>>;
 
 macro_rules! mkstats (
   ($fn1: ident $(,$fnname: ident)* ) => (
@@ -57,7 +57,7 @@ macro_rules! time (
 )
 
 mkstats!(cf, switch, pop, pop1, pop2, pop3, pop4, pop6, pop7, lrotate, rrotate,
-         lrotate_flip, rrotate_flip, moveRedRight, moveRedLeft, fix)
+         lrotate_flip, rrotate_flip, move_red_right, move_red_left, fix)
 */
 macro_rules! time (
   ($fnname: ident) => (())
@@ -95,10 +95,10 @@ struct Node<K, V> {
 #[deriving(Show)]
 struct ColoredNode<K, V> {
   color: Color,
-  node: Option<~Node<K, V>>
+  node: Option<BNode<K, V>>
 }
 
-impl<K: Ord, V: Eq> Eq for ColoredNode<K, V> {
+impl<K: Ord, V: PartialEq> PartialEq for ColoredNode<K, V> {
   fn eq(&self, other: &ColoredNode<K, V>) -> bool {
     self.node == other.node
   }
@@ -114,7 +114,7 @@ impl<K: Ord, V> ColoredNode<K, V> {
   fn insert(&mut self, key: K, mut val: V) -> Option<V> {
     match self.node {
       None => {
-        self.node = Some(~Node::new(key, val));
+        self.node = Some(box Node::new(key, val));
         self.color = RED;
         None
       }
@@ -148,13 +148,13 @@ impl<K: Ord, V> ColoredNode<K, V> {
     }
   }
 
-  fn pop_min(&mut self) -> ~Node<K, V> {
+  fn pop_min(&mut self) -> BNode<K, V> {
     let mut node = self.node.take_unwrap();
     if node.left.node.is_none() {
       self.color = BLACK;
       return node;
     } else if node.left.color == BLACK && node.left.node.as_ref().unwrap().left.color == BLACK {
-      node.moveRedLeft(&mut self.color);
+      node.move_red_left(&mut self.color);
     }
     let ret = node.left.pop_min();
     node.fix(&mut self.color);
@@ -173,7 +173,7 @@ impl<K: Ord, V> ColoredNode<K, V> {
             None => false,
           } {
             time!(pop1);
-            node.moveRedLeft(&mut self.color);
+            node.move_red_left(&mut self.color);
           }
           let ret = node.left.pop(key);
           time!(pop2);
@@ -192,7 +192,7 @@ impl<K: Ord, V> ColoredNode<K, V> {
           None => false,
         } {
           time!(pop4);
-          node.moveRedRight(&mut self.color);
+          node.move_red_right(&mut self.color);
         }
         if *key > node.key {
           let ret = node.right.pop(key);
@@ -203,7 +203,7 @@ impl<K: Ord, V> ColoredNode<K, V> {
         }
         time!(pop7);
         let mut min = node.right.pop_min();
-        let ~Node {left: l, right: r, data: d, key: _} = node;
+        let box Node {left: l, right: r, data: d, key: _} = node;
         min.left = l;
         min.right = r;
         min.fix(&mut self.color);
@@ -217,8 +217,8 @@ impl<K: Ord, V> ColoredNode<K, V> {
 
 #[doc(hidden)]
 trait NodeRef<K, V> {
-  fn moveRedLeft(&mut self, c: &mut Color);
-  fn moveRedRight(&mut self, c: &mut Color);
+  fn move_red_left(&mut self, c: &mut Color);
+  fn move_red_right(&mut self, c: &mut Color);
   fn lrotate(&mut self);
   fn rrotate(&mut self);
   fn lrotate_flip(&mut self, c: &mut Color);
@@ -226,9 +226,9 @@ trait NodeRef<K, V> {
   fn fix(&mut self, c: &mut Color);
 }
 
-impl<K: Ord, V> NodeRef<K, V> for ~Node<K, V> {
-  fn moveRedLeft(&mut self, c: &mut Color) {
-    time!(moveRedLeft);
+impl<K: Ord, V> NodeRef<K, V> for BNode<K, V> {
+  fn move_red_left(&mut self, c: &mut Color) {
+    time!(move_red_left);
     self.color_flip(c);
     if match self.right.node {
       Some(ref n) => n.left.color == RED,
@@ -239,8 +239,8 @@ impl<K: Ord, V> NodeRef<K, V> for ~Node<K, V> {
     }
   }
 
-  fn moveRedRight(&mut self, c: &mut Color) {
-    time!(moveRedRight);
+  fn move_red_right(&mut self, c: &mut Color) {
+    time!(move_red_right);
     self.color_flip(c);
     if match self.left.node {
       Some(ref n) => n.left.color == RED,
@@ -343,7 +343,7 @@ impl<K: Ord, V> Node<K, V> {
     print!("\n");
   }
 
-  fn is_sound(&self, c: Color) -> Result<Vec<uint>, ~str> {
+  fn is_sound(&self, c: Color) -> Result<Vec<uint>, String> {
     if self.left.color == RED && self.left.node.is_none() {
       return Err(format!("Red left leaf for {:?}", self.key));
     } else if self.right.color == RED && self.right.node.is_none() {
@@ -387,7 +387,7 @@ impl<K: Ord, V> Node<K, V> {
   }
 }
 
-impl<K: Ord, V: Eq> Eq for Node<K, V> {
+impl<K: Ord, V: PartialEq> PartialEq for Node<K, V> {
   fn eq(&self, other: &Node<K, V>) -> bool {
     self.key <= other.key && self.key >= other.key &&
       self.data == other.data &&
@@ -455,7 +455,7 @@ impl<K: Ord+Eq, V: Eq> RbTree<K, V> {
   }
 }
 
-impl<K, V> Container for RbTree<K, V> {
+impl<K, V> Collection for RbTree<K, V> {
   /// Returns the number of elements stored in the tree.
   fn len(&self) -> uint {
     self.len
@@ -488,7 +488,7 @@ impl<K: Ord, V> MutableMap<K, V> for RbTree<K, V> {
   /// Return a mutable reference to the value corresponding to the key
   fn find_mut<'a>(&'a mut self, k: &K) -> Option<&'a mut V> {
     unsafe {
-      self.find(k).map(|result| std::cast::transmute_mut(result))
+      self.find(k).map(|result| std::mem::transmute(result))
     }
   }
 }
@@ -501,7 +501,7 @@ impl<K, V> Mutable for RbTree<K, V> {
   }
 }
 
-impl<K: Ord+Eq, V: Eq> Eq for RbTree<K, V> {
+impl<K: Ord+PartialEq, V: PartialEq> PartialEq for RbTree<K, V> {
   /// Returns true if both trees contain the same values.
   fn eq(&self, other: &RbTree<K, V>) -> bool {
     self.len == other.len && {
@@ -542,7 +542,7 @@ pub struct Entries<'tree, K, V> {
 }
 
 impl<'tree, K: Ord, V> Entries<'tree, K, V> {
-  fn push_left_tree(&mut self, root: Option<&'tree ~Node<K, V>>) {
+  fn push_left_tree(&mut self, root: Option<&'tree BNode<K, V>>) {
     root.while_some(|node_ref| {
       self.stack.push(&**node_ref);
       node_ref.left.node.as_ref()
@@ -580,7 +580,7 @@ impl<'tree, K: Ord, V> Iterator<(&'tree K, &'tree V)> for Entries<'tree, K, V> {
 // Used in the tests.
 #[allow(dead_code)]
 fn mkcn<K: Ord, V>(k: K, v: V) -> ColoredNode<K, V> {
-  ColoredNode { color: BLACK, node: Some(~Node::new(k, v)), }
+  ColoredNode { color: BLACK, node: Some(box Node::new(k, v)), }
 }
 
 #[test]
@@ -639,47 +639,47 @@ fn test_swap() {
 
 #[test]
 fn test_equality() {
-  let (t1, t2): (RbTree<~str, ~str>, RbTree<~str, ~str>) = (RbTree::new(), RbTree::new());
+  let (t1, t2): (RbTree<String, String>, RbTree<String, String>) = (RbTree::new(), RbTree::new());
   assert_eq!(t1, t1);
   assert_eq!(t1, t2);
   assert_eq!(t2, t2);
   let mut t3 = RbTree::new();
-  t3.insert(~"C", ~"valueC");
-  t3.insert(~"A", ~"valueA");
-  t3.insert(~"D", ~"valueD");
-  t3.insert(~"B", ~"valueB");
+  t3.insert("C".to_string(), "valueC".to_string());
+  t3.insert("A".to_string(), "valueA".to_string());
+  t3.insert("D".to_string(), "valueD".to_string());
+  t3.insert("B".to_string(), "valueB".to_string());
   assert!(t1 != t3);
   let mut t4 = RbTree::new();
-  t4.insert(~"B", ~"valueB");
-  t4.insert(~"A", ~"valueA");
-  t4.insert(~"C", ~"valueC");
-  t4.insert(~"D", ~"valueD");
+  t4.insert("B".to_string(), "valueB".to_string());
+  t4.insert("A".to_string(), "valueA".to_string());
+  t4.insert("C".to_string(), "valueC".to_string());
+  t4.insert("D".to_string(), "valueD".to_string());
   assert_eq!(t3, t4);
 }
 
 #[test]
 fn test_exact_equality() {
-  let (t1, t2): (RbTree<~str, ~str>, RbTree<~str, ~str>) = (RbTree::new(), RbTree::new());
+  let (t1, t2): (RbTree<String, String>, RbTree<String, String>) = (RbTree::new(), RbTree::new());
   assert!(t1.exact_eq(&t1));
   assert!(t1.exact_eq(&t2));
   assert!(t2.exact_eq(&t2));
   let mut t3 = RbTree::new();
-  t3.insert(~"C", ~"valueC");
-  t3.insert(~"A", ~"valueA");
-  t3.insert(~"D", ~"valueD");
-  t3.insert(~"B", ~"valueB");
+  t3.insert("C".to_string(), "valueC".to_string());
+  t3.insert("A".to_string(), "valueA".to_string());
+  t3.insert("D".to_string(), "valueD".to_string());
+  t3.insert("B".to_string(), "valueB".to_string());
   assert!(t1 != t3);
   let mut t4 = RbTree::new();
-  t4.insert(~"B", ~"valueB");
-  t4.insert(~"A", ~"valueA");
-  t4.insert(~"C", ~"valueC");
-  t4.insert(~"D", ~"valueD");
+  t4.insert("B".to_string(), "valueB".to_string());
+  t4.insert("A".to_string(), "valueA".to_string());
+  t4.insert("C".to_string(), "valueC".to_string());
+  t4.insert("D".to_string(), "valueD".to_string());
   assert!(!t3.exact_eq(&t4));
   let mut t5 = RbTree::new();
-  t5.insert(~"A", ~"valueA");
-  t5.insert(~"B", ~"valueB");
-  t5.insert(~"C", ~"valueC");
-  t5.insert(~"D", ~"valueD");
+  t5.insert("A".to_string(), "valueA".to_string());
+  t5.insert("B".to_string(), "valueB".to_string());
+  t5.insert("C".to_string(), "valueC".to_string());
+  t5.insert("D".to_string(), "valueD".to_string());
   assert!(!t3.exact_eq(&t5));
   assert!(t4.exact_eq(&t5));
 }
@@ -722,40 +722,39 @@ fn test_root_rrotate() {
 
 #[test]
 fn test_find() {
-  use std::strbuf::StrBuf;
   let mut rbt = RbTree::new();
-  rbt.insert(~"key3", StrBuf::from_str("C"));
-  rbt.insert(~"key1", StrBuf::from_str("A"));
-  rbt.insert(~"key2", StrBuf::from_str("B"));
+  rbt.insert("key3".to_string(), "C".to_string());
+  rbt.insert("key1".to_string(), "A".to_string());
+  rbt.insert("key2".to_string(), "B".to_string());
   rbt.is_sound() || fail!();
-  rbt.find(&~"key1").unwrap().as_slice() == "A" || fail!();
-  rbt.find(&~"key4").is_none() || fail!();
-  rbt.find_mut(&~"key2").map(|ret| ret.push_char('D'));
-  rbt.find(&~"key2").unwrap().as_slice() == "BD" || fail!();
+  rbt.find(&"key1".to_string()).unwrap().as_slice() == "A" || fail!();
+  rbt.find(&"key4".to_string()).is_none() || fail!();
+  rbt.find_mut(&"key2".to_string()).map(|ret| ret.push_char('D'));
+  rbt.find(&"key2".to_string()).unwrap().as_slice() == "BD" || fail!();
 }
 
 #[test]
 fn test_pop1() {
   let mut rbt = RbTree::new();
-  rbt.insert(~"key7", ~"G");
-  rbt.insert(~"key1", ~"A");
-  rbt.insert(~"key3", ~"C");
-  rbt.insert(~"key8", ~"H");
-  rbt.insert(~"key2", ~"B");
-  rbt.insert(~"key4", ~"D");
-  rbt.insert(~"key5", ~"E");
-  rbt.insert(~"key9", ~"I");
-  rbt.insert(~"key6", ~"F");
+  rbt.insert("key7", "G");
+  rbt.insert("key1", "A");
+  rbt.insert("key3", "C");
+  rbt.insert("key8", "H");
+  rbt.insert("key2", "B");
+  rbt.insert("key4", "D");
+  rbt.insert("key5", "E");
+  rbt.insert("key9", "I");
+  rbt.insert("key6", "F");
   rbt.is_sound() || fail!();
-  rbt.pop(&~"key3").unwrap() == ~"C" || fail!();
+  rbt.pop(&"key3").unwrap() == "C" || fail!();
   rbt.is_sound() || fail!();
-  rbt.pop(&~"notakey").is_none() || fail!();
+  rbt.pop(&"notakey").is_none() || fail!();
   rbt.is_sound() || fail!();
-  rbt.pop(&~"key5").unwrap() == ~"E" || fail!();
+  rbt.pop(&"key5").unwrap() == "E" || fail!();
   rbt.is_sound() || fail!();
-  rbt.pop(&~"key1").unwrap() == ~"A" || fail!();
+  rbt.pop(&"key1").unwrap() == "A" || fail!();
   rbt.is_sound() || fail!();
-  rbt.pop(&~"key9").unwrap() == ~"I" || fail!();
+  rbt.pop(&"key9").unwrap() == "I" || fail!();
   rbt.is_sound() || fail!();
   rbt.is_empty() && fail!();
 }
@@ -794,8 +793,8 @@ fn test_pop_measured() {
   print_stats!(lrotate_flip);
   print_stats!(rrotate_flip);
   print_stats!(fix);
-  print_stats!(moveRedLeft);
-  print_stats!(moveRedRight);
+  print_stats!(move_red_left);
+  print_stats!(move_red_right);
   print_stats!(cf);
   print_stats!(switch);
   print_stats!(pop);
@@ -906,7 +905,7 @@ fn bench_find_tm(b: &mut Bencher) {
 
 #[bench]
 fn bench_insertion_empty_hm(b: &mut Bencher) {
-  use collections::hashmap::HashMap;
+  use std::collections::hashmap::HashMap;
   b.iter(|| {
     let mut rbt = HashMap::new();
     rbt.insert(1, 1);
@@ -915,7 +914,7 @@ fn bench_insertion_empty_hm(b: &mut Bencher) {
 
 #[bench]
 fn bench_insertion_hm(b: &mut Bencher) {
-  use collections::hashmap::HashMap;
+  use std::collections::hashmap::HashMap;
   let mut rng = task_rng();
   b.iter(|| {
     let mut rbt = HashMap::new();
@@ -927,7 +926,7 @@ fn bench_insertion_hm(b: &mut Bencher) {
 
 #[bench]
 fn bench_insert_pop_hm(b: &mut Bencher) {
-  use collections::hashmap::HashMap;
+  use std::collections::hashmap::HashMap;
   let mut rng = task_rng();
   b.iter(|| {
     let mut rbt = HashMap::new();
@@ -942,7 +941,7 @@ fn bench_insert_pop_hm(b: &mut Bencher) {
 
 #[bench]
 fn bench_find_hm(b: &mut Bencher) {
-  use collections::hashmap::HashMap;
+  use std::collections::hashmap::HashMap;
   let mut rng = task_rng();
   let mut rbt = HashMap::new();
   for i in range(0, 100) {
