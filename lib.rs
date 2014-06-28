@@ -811,7 +811,7 @@ fn test_pop_measured() {
 fn bench_insertion_empty(b: &mut Bencher) {
   b.iter(|| {
     let mut rbt = RbTree::new();
-    rbt.insert(1, 1);
+    rbt.insert(1i, 1i);
   });
 }
 
@@ -820,7 +820,7 @@ fn bench_insertion(b: &mut Bencher) {
   let mut rng = task_rng();
   b.iter(|| {
     let mut rbt = RbTree::new();
-    for i in range(0, 50) {
+    for i in range(0u, 50u) {
       rbt.insert(rng.gen_range(-100i, 100), i);
     }
   });
@@ -831,10 +831,10 @@ fn bench_insert_pop(b: &mut Bencher) {
   let mut rng = task_rng();
   b.iter(|| {
     let mut rbt = RbTree::new();
-    for i in range(0, 50) {
+    for i in range(0u, 50u) {
       rbt.insert(rng.gen_range(-100i, 100), i);
     }
-    for _ in range(0, 50) {
+    for _ in range(0u, 50u) {
       rbt.pop(&rng.gen_range(-100i,100));
     }
   });
@@ -844,7 +844,7 @@ fn bench_insert_pop(b: &mut Bencher) {
 fn bench_find(b: &mut Bencher) {
   let mut rng = task_rng();
   let mut rbt = RbTree::new();
-  for i in range(0, 100) {
+  for i in range(0u, 100u) {
     rbt.insert(rng.gen_range(-100i, 100), i);
   }
 
@@ -858,7 +858,7 @@ fn bench_insertion_empty_tm(b: &mut Bencher) {
   use collections::treemap::TreeMap;
   b.iter(|| {
     let mut rbt = TreeMap::new();
-    rbt.insert(1, 1);
+    rbt.insert(1i, 1i);
   });
 }
 
@@ -868,7 +868,7 @@ fn bench_insertion_tm(b: &mut Bencher) {
   let mut rng = task_rng();
   b.iter(|| {
     let mut rbt = TreeMap::new();
-    for i in range(0, 50) {
+    for i in range(0u, 50u) {
       rbt.insert(rng.gen_range(-100i, 100), i);
     }
   });
@@ -880,10 +880,10 @@ fn bench_insert_pop_tm(b: &mut Bencher) {
   let mut rng = task_rng();
   b.iter(|| {
     let mut rbt = TreeMap::new();
-    for i in range(0, 50) {
+    for i in range(0u, 50u) {
       rbt.insert(rng.gen_range(-100i, 100), i);
     }
-    for _ in range(0, 50) {
+    for _ in range(0u, 50u) {
       rbt.pop(&rng.gen_range(-100i,100));
     }
   });
@@ -894,7 +894,7 @@ fn bench_find_tm(b: &mut Bencher) {
   use collections::treemap::TreeMap;
   let mut rng = task_rng();
   let mut rbt = TreeMap::new();
-  for i in range(0, 100) {
+  for i in range(0u, 100u) {
     rbt.insert(rng.gen_range(-100i, 100), i);
   }
 
@@ -908,7 +908,7 @@ fn bench_insertion_empty_hm(b: &mut Bencher) {
   use std::collections::hashmap::HashMap;
   b.iter(|| {
     let mut rbt = HashMap::new();
-    rbt.insert(1, 1);
+    rbt.insert(1i, 1i);
   });
 }
 
@@ -918,7 +918,7 @@ fn bench_insertion_hm(b: &mut Bencher) {
   let mut rng = task_rng();
   b.iter(|| {
     let mut rbt = HashMap::new();
-    for i in range(0, 50) {
+    for i in range(0u, 50u) {
       rbt.insert(rng.gen_range(-100i, 100), i);
     }
   });
@@ -930,10 +930,10 @@ fn bench_insert_pop_hm(b: &mut Bencher) {
   let mut rng = task_rng();
   b.iter(|| {
     let mut rbt = HashMap::new();
-    for i in range(0, 50) {
+    for i in range(0u, 50u) {
       rbt.insert(rng.gen_range(-100i, 100), i);
     }
-    for _ in range(0, 50) {
+    for _ in range(0u, 50u) {
       rbt.pop(&rng.gen_range(-100i,100));
     }
   });
@@ -944,7 +944,7 @@ fn bench_find_hm(b: &mut Bencher) {
   use std::collections::hashmap::HashMap;
   let mut rng = task_rng();
   let mut rbt = HashMap::new();
-  for i in range(0, 100) {
+  for i in range(0u, 100u) {
     rbt.insert(rng.gen_range(-100i, 100), i);
   }
 
