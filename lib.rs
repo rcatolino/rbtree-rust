@@ -1,5 +1,5 @@
 #![allow(unused_imports)] // This is for the timer code, only used when the macros are invoked.
-#![crate_id = "rbtree"]
+#![crate_name = "rbtree"]
 #![crate_type = "lib"]
 #![feature(asm, macro_rules)]
 
@@ -77,7 +77,7 @@ fn m_depth(n: uint) -> uint {
 
 #[inline]
 fn ptr_eq<T>(t1: &T, t2: &T) -> bool {
-  t1 as *T == t2 as *T
+  t1 as *const T == t2 as *const T
 }
 
 type Color = u8;
